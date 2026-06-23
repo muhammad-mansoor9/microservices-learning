@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: order-service
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus

@@ -7,6 +7,7 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClientBuilder;
 
 import java.net.URI;
 
@@ -27,7 +28,7 @@ public class AwsConfig {
 
     @Bean
     public DynamoDbClient dynamoDbClient() {
-        DynamoDbClient.Builder builder = DynamoDbClient.builder()
+        DynamoDbClientBuilder builder = DynamoDbClient.builder()
                 .region(Region.of(awsRegion))
                 .credentialsProvider(
                         StaticCredentialsProvider.create(

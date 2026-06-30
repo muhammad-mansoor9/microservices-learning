@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://postgres:5432/order_db
+    username: postgres
+    password: ${POSTGRES_PASSWORD:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: update
+
+services:
+  payment-url: http://payment-service:8082
+  user-url: http://user-service:8083
+
+management:
+  endpoint:
+    health:
+      show-details: always

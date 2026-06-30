@@ -1,0 +1,19 @@
+server:
+  port: 8083
+
+aws:
+  region: us-east-1
+  endpoint-override: http://localstack:4566
+  access-key: test
+  secret-key: test
+  dynamodb:
+    table-name: users
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always

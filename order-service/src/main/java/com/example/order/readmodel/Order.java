@@ -1,5 +1,6 @@
 package com.example.order.readmodel;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -36,6 +37,7 @@ public class Order implements Persistable<UUID> {
 
     @Override
     @Transient
+    @JsonIgnore
     public boolean isNew() {
         return true;
     }

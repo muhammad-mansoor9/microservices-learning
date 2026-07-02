@@ -8,6 +8,10 @@ spring:
     hibernate:
       ddl-auto: update
 
+services:
+  user-service-url: http://localhost:8083
+  payment-service-url: http://localhost:8082
+
 management:
   endpoint:
     health:

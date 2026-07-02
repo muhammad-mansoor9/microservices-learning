@@ -8,8 +8,8 @@ spring:
       ddl-auto: update
 
 services:
-  payment-url: http://payment-service:8082
-  user-url: http://user-service:8083
+  user-service-url: http://user-service:8083
+  payment-service-url: http://payment-service:8082
 
 management:
   endpoint:

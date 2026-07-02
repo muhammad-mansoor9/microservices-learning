@@ -14,6 +14,10 @@ spring:
     hibernate:
       ddl-auto: validate
 
+services:
+  user-service-url: ${USER_SERVICE_URL}
+  payment-service-url: ${PAYMENT_SERVICE_URL}
+
 management:
   endpoint:
     health:

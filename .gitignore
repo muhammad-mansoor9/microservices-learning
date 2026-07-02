@@ -25,3 +25,15 @@ replay_pid*
 
 # Local environment secrets
 .env
+
+# Maven build output
+target/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfstate.lock.info
+
+# Claude Code internal
+.claude/

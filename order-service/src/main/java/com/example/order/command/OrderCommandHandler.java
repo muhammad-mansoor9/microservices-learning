@@ -1,7 +1,9 @@
 package com.example.order.command;
 
 import com.example.order.event.OrderCancelledEvent;
+import com.example.order.event.OrderConfirmedEvent;
 import com.example.order.event.OrderCreatedEvent;
+import com.example.order.event.OrderFailedEvent;
 import com.example.order.infrastructure.client.PaymentServiceClient;
 import com.example.order.infrastructure.client.UserServiceClient;
 import com.example.order.infrastructure.client.dto.PaymentRequest;
@@ -71,12 +73,15 @@ public class OrderCommandHandler {
         return orderId;
     }
 
-    private void finaliseOrder(UUID orderId, OrderStatus status, String cancelReason) {
+    private void finaliseOrder(UUID orderId, OrderStatus status, String reason) {
         Order order = orderRepository.findById(orderId).orElseThrow();
         order.setStatus(status);
-        if (cancelReason != null) {
-            appendEvent(orderId, "OrderCancelled",
-                    new OrderCancelledEvent(orderId, cancelReason, Instant.now()));
+        Instant now = Instant.now();
+        switch (status) {
+            case CONFIRMED -> appendEvent(orderId, "OrderConfirmed", new OrderConfirmedEvent(orderId, now));
+            case FAILED    -> appendEvent(orderId, "OrderFailed",    new OrderFailedEvent(orderId, reason, now));
+            case CANCELLED -> appendEvent(orderId, "OrderCancelled", new OrderCancelledEvent(orderId, reason, now));
+            default -> { /* PENDING is set on creation; no terminal event needed */ }
         }
         // no explicit save() — dirty checking flushes the status change at commit
     }

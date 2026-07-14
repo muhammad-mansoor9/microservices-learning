@@ -14,4 +14,6 @@ public interface OrderEventRepository extends JpaRepository<OrderEvent, UUID> {
 
     @Query("SELECT MAX(e.version) FROM OrderEvent e WHERE e.aggregateId = :aggregateId")
     Optional<Integer> findMaxVersionByAggregateId(@Param("aggregateId") UUID aggregateId);
+
+    List<OrderEvent> findAllByOrderByOccurredAtAsc();
 }

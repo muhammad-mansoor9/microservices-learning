@@ -1,0 +1,9 @@
+# Centralised configuration for user-service
+# Values here are merged with the service's own application.yml at startup.
+# Override any property that should differ per environment or be managed centrally.
+
+# Example overrides (uncomment and adjust as needed):
+# aws:
+#   region: us-east-1
+#   dynamodb:
+#     table-name: users

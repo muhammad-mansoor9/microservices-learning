@@ -1,0 +1,6 @@
+eureka:
+  instance:
+    hostname: ${EUREKA_HOSTNAME}
+  client:
+    serviceUrl:
+      defaultZone: http://${EUREKA_HOSTNAME}:${server.port}/eureka/

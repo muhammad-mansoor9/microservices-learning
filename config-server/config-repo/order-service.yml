@@ -1,6 +1,11 @@
 # Centralised configuration for order-service
 # Values here are merged with the service's own application.yml at startup.
-# Override any property that should differ per environment or be managed centrally.
+
+# Shared internal API key — rotate this value to re-key all services at once.
+# Set to a strong random secret in production.
+internal:
+  api:
+    key: ${INTERNAL_API_KEY:local-dev-key}
 
 # Example overrides (uncomment and adjust as needed):
 # spring:
@@ -8,5 +13,5 @@
 #     show-sql: true
 
 # services:
-#   user-service-url: http://user-service:8083
+#   user-service-url: http://order-service:8081
 #   payment-service-url: http://payment-service:8082

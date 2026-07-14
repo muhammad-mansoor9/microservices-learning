@@ -1,6 +1,10 @@
 # Centralised configuration for payment-service
 # Values here are merged with the service's own application.yml at startup.
-# Override any property that should differ per environment or be managed centrally.
+
+# Shared internal API key — must match the value set in order-service.yml.
+internal:
+  api:
+    key: ${INTERNAL_API_KEY:local-dev-key}
 
 # Example overrides (uncomment and adjust as needed):
 # spring:

@@ -95,3 +95,93 @@ jobs:
         with:
           name: user-service-jar
           path: user-service/target/*.jar
+
+  build-eureka-server:
+    name: Build eureka-server
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-
+
+      - name: Build eureka-server
+        run: mvn --batch-mode --no-transfer-progress clean package -DskipTests
+        working-directory: eureka-server
+
+      - name: Upload eureka-server JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: eureka-server-jar
+          path: eureka-server/target/*.jar
+
+  build-config-server:
+    name: Build config-server
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-
+
+      - name: Build config-server
+        run: mvn --batch-mode --no-transfer-progress clean package -DskipTests
+        working-directory: config-server
+
+      - name: Upload config-server JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: config-server-jar
+          path: config-server/target/*.jar
+
+  build-api-gateway:
+    name: Build api-gateway
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-
+
+      - name: Build api-gateway
+        run: mvn --batch-mode --no-transfer-progress clean package -DskipTests
+        working-directory: api-gateway
+
+      - name: Upload api-gateway JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-gateway-jar
+          path: api-gateway/target/*.jar

@@ -9,6 +9,16 @@ aws:
   dynamodb:
     table-name: users
 
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://eureka-server:8761/eureka/
+
+spring:
+  cloud:
+    config:
+      uri: http://config-server:8888
+
 management:
   endpoints:
     web:

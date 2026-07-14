@@ -1,0 +1,12 @@
+# Centralised configuration for order-service
+# Values here are merged with the service's own application.yml at startup.
+# Override any property that should differ per environment or be managed centrally.
+
+# Example overrides (uncomment and adjust as needed):
+# spring:
+#   jpa:
+#     show-sql: true
+
+# services:
+#   user-service-url: http://user-service:8083
+#   payment-service-url: http://payment-service:8082

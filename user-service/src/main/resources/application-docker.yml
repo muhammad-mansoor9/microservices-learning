@@ -9,6 +9,10 @@ aws:
   dynamodb:
     table-name: users
 
+internal:
+  api:
+    key: ${INTERNAL_API_KEY:docker-dev-key}
+
 eureka:
   client:
     serviceUrl:

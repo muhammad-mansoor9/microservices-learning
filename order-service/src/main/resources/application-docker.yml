@@ -6,20 +6,22 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+  cloud:
+    config:
+      uri: http://config-server:8888
 
 services:
   user-service-url: http://user-service:8083
   payment-service-url: http://payment-service:8082
 
+internal:
+  api:
+    key: ${INTERNAL_API_KEY:docker-dev-key}
+
 eureka:
   client:
     serviceUrl:
       defaultZone: http://eureka-server:8761/eureka/
-
-spring:
-  cloud:
-    config:
-      uri: http://config-server:8888
 
 management:
   endpoint:

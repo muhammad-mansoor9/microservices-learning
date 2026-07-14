@@ -69,6 +69,70 @@ services:
       - ms-network
     restart: "no"
 
+  # ── Spring Cloud Infrastructure ─────────────────────────────────────────────
+
+  eureka-server:
+    build:
+      context: .
+      dockerfile: eureka-server/Dockerfile
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    networks:
+      - ms-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  config-server:
+    build:
+      context: .
+      dockerfile: config-server/Dockerfile
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    environment:
+      - SPRING_PROFILES_ACTIVE=native,docker
+      - INTERNAL_API_KEY=docker-dev-key
+    volumes:
+      - ./config-server/config-repo:/config-repo:ro
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - ms-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - INTERNAL_API_KEY=docker-dev-key
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - ms-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
   # ── Microservices ───────────────────────────────────────────────────────────
 
   user-service:
@@ -80,8 +144,12 @@ services:
       - "8083:8083"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      - INTERNAL_API_KEY=docker-dev-key
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
     depends_on:
       localstack:
+        condition: service_healthy
+      eureka-server:
         condition: service_healthy
     networks:
       - ms-network
@@ -102,8 +170,12 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - POSTGRES_PASSWORD=postgres
+      - INTERNAL_API_KEY=docker-dev-key
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
     depends_on:
       postgres:
+        condition: service_healthy
+      eureka-server:
         condition: service_healthy
     networks:
       - ms-network
@@ -124,12 +196,16 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - POSTGRES_PASSWORD=postgres
+      - INTERNAL_API_KEY=docker-dev-key
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
     depends_on:
       postgres:
         condition: service_healthy
       payment-service:
         condition: service_healthy
       user-service:
+        condition: service_healthy
+      eureka-server:
         condition: service_healthy
     networks:
       - ms-network

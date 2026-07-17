@@ -4,24 +4,27 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.annotation.Order;
-import org.springframework.stereotype.Component;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
 
-@Component
-@Order(2)
+/**
+ * Registered inside the Spring Security filter chain (before BearerTokenAuthenticationFilter).
+ * A valid X-Internal-Api-Key sets INTERNAL authority, bypassing JWT validation.
+ */
 public class InternalApiKeyFilter extends OncePerRequestFilter {
 
-    private static final Logger log = LoggerFactory.getLogger(InternalApiKeyFilter.class);
     private static final String API_KEY_HEADER = "X-Internal-Api-Key";
 
-    @Value("${internal.api.key}")
-    private String expectedApiKey;
+    private final String expectedApiKey;
+
+    public InternalApiKeyFilter(String expectedApiKey) {
+        this.expectedApiKey = expectedApiKey;
+    }
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -32,15 +35,10 @@ public class InternalApiKeyFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         String key = request.getHeader(API_KEY_HEADER);
-        if (key == null || !key.equals(expectedApiKey)) {
-            log.warn("Rejected request from {} {} {} - missing or invalid API key",
-                    request.getRemoteAddr(), request.getMethod(), request.getRequestURI());
-            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            response.setContentType("application/json");
-            response.setCharacterEncoding("UTF-8");
-            response.getWriter().write(
-                    "{\"error\":\"Forbidden\",\"message\":\"Missing or invalid internal API key\"}");
-            return;
+        if (key != null && key.equals(expectedApiKey)) {
+            UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                    "internal", null, List.of(new SimpleGrantedAuthority("INTERNAL")));
+            SecurityContextHolder.getContext().setAuthentication(auth);
         }
         filterChain.doFilter(request, response);
     }

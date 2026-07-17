@@ -18,6 +18,13 @@ internal:
   api:
     key: ${INTERNAL_API_KEY:docker-dev-key}
 
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI}
+
 eureka:
   client:
     serviceUrl:

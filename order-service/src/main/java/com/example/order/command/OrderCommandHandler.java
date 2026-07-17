@@ -10,6 +10,8 @@ import com.example.order.infrastructure.client.dto.PaymentRequest;
 import com.example.order.infrastructure.client.dto.PaymentResponse;
 import com.example.order.infrastructure.client.exception.PaymentServiceException;
 import com.example.order.infrastructure.client.exception.UserNotFoundException;
+import com.example.order.infrastructure.security.JwtClaimsExtractor;
+import com.example.order.infrastructure.security.UserContext;
 import com.example.order.model.OrderEvent;
 import com.example.order.model.OrderEventRepository;
 import com.example.order.readmodel.Order;
@@ -18,6 +20,9 @@ import com.example.order.readmodel.OrderStatus;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -28,14 +33,21 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OrderCommandHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(OrderCommandHandler.class);
+
     private final OrderEventRepository orderEventRepository;
     private final OrderRepository orderRepository;
     private final ObjectMapper objectMapper;
     private final UserServiceClient userServiceClient;
     private final PaymentServiceClient paymentServiceClient;
     private final TransactionTemplate transactionTemplate;
+    private final JwtClaimsExtractor jwtClaimsExtractor;
+    private final UserContext userContext;
 
     public UUID handle(CreateOrderCommand command) {
+        jwtClaimsExtractor.populate();
+        log.info("Creating order username={} traceId={}", userContext.getUsername(), MDC.get("traceId"));
+
         // Phase 1: validate user — no DB connection held
         userServiceClient.findById(command.userId())
                 .orElseThrow(() -> new UserNotFoundException(command.userId()));

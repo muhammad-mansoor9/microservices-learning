@@ -1,37 +1,37 @@
 package com.example.user.security;
 
-import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
-@RequiredArgsConstructor
-public class JwtClaimsExtractor {
+public class JwtClaimsExtractor extends JwtAuthenticationConverter {
 
     private final UserContext userContext;
 
-    public void populate() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth instanceof JwtAuthenticationToken jwtAuth) {
-            Jwt jwt = jwtAuth.getToken();
-            userContext.setUsername(jwt.getClaimAsString("preferred_username"));
-            userContext.setEmail(jwt.getClaimAsString("email"));
-            userContext.setRoles(extractRealmRoles(jwt));
-        } else if (auth != null && isInternal(auth)) {
-            userContext.setUsername("internal");
-            userContext.setRoles(List.of("INTERNAL"));
-        }
+    public JwtClaimsExtractor(UserContext userContext) {
+        this.userContext = userContext;
+        setJwtGrantedAuthoritiesConverter(jwt ->
+                extractRealmRoles(jwt).stream()
+                        .map(r -> new SimpleGrantedAuthority("ROLE_" + r.toUpperCase()))
+                        .collect(Collectors.toList())
+        );
     }
 
-    private boolean isInternal(Authentication auth) {
-        return auth.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("INTERNAL"));
+    @Override
+    public AbstractAuthenticationToken convert(Jwt jwt) {
+        List<String> roles = extractRealmRoles(jwt);
+        userContext.setUsername(jwt.getClaimAsString("preferred_username"));
+        userContext.setEmail(jwt.getClaimAsString("email"));
+        userContext.setRoles(roles);
+
+        return super.convert(jwt);
     }
 
     private List<String> extractRealmRoles(Jwt jwt) {

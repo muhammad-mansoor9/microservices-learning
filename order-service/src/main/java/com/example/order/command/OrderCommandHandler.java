@@ -10,7 +10,6 @@ import com.example.order.infrastructure.client.dto.PaymentRequest;
 import com.example.order.infrastructure.client.dto.PaymentResponse;
 import com.example.order.infrastructure.client.exception.PaymentServiceException;
 import com.example.order.infrastructure.client.exception.UserNotFoundException;
-import com.example.order.infrastructure.security.JwtClaimsExtractor;
 import com.example.order.infrastructure.security.UserContext;
 import com.example.order.model.OrderEvent;
 import com.example.order.model.OrderEventRepository;
@@ -41,12 +40,11 @@ public class OrderCommandHandler {
     private final UserServiceClient userServiceClient;
     private final PaymentServiceClient paymentServiceClient;
     private final TransactionTemplate transactionTemplate;
-    private final JwtClaimsExtractor jwtClaimsExtractor;
     private final UserContext userContext;
 
     public UUID handle(CreateOrderCommand command) {
-        jwtClaimsExtractor.populate();
-        log.info("Creating order username={} traceId={}", userContext.getUsername(), MDC.get("traceId"));
+        String actor = userContext.getUsername() != null ? userContext.getUsername() : "internal";
+        log.info("Creating order username={} traceId={}", actor, MDC.get("traceId"));
 
         // Phase 1: validate user — no DB connection held
         userServiceClient.findById(command.userId())

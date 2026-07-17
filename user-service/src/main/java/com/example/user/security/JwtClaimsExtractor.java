@@ -1,37 +1,40 @@
 package com.example.user.security;
 
-import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
-@RequiredArgsConstructor
-public class JwtClaimsExtractor {
+public class JwtClaimsExtractor implements Converter<Jwt, AbstractAuthenticationToken> {
 
     private final UserContext userContext;
 
-    public void populate() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth instanceof JwtAuthenticationToken jwtAuth) {
-            Jwt jwt = jwtAuth.getToken();
-            userContext.setUsername(jwt.getClaimAsString("preferred_username"));
-            userContext.setEmail(jwt.getClaimAsString("email"));
-            userContext.setRoles(extractRealmRoles(jwt));
-        } else if (auth != null && isInternal(auth)) {
-            userContext.setUsername("internal");
-            userContext.setRoles(List.of("INTERNAL"));
-        }
+    public JwtClaimsExtractor(UserContext userContext) {
+        this.userContext = userContext;
     }
 
-    private boolean isInternal(Authentication auth) {
-        return auth.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("INTERNAL"));
+    @Override
+    public AbstractAuthenticationToken convert(Jwt jwt) {
+        List<String> roles = extractRealmRoles(jwt);
+
+        userContext.setUsername(jwt.getClaimAsString("preferred_username"));
+        userContext.setEmail(jwt.getClaimAsString("email"));
+        userContext.setRoles(roles);
+
+        Collection<GrantedAuthority> authorities = roles.stream()
+                .map(r -> new SimpleGrantedAuthority("ROLE_" + r.toUpperCase()))
+                .collect(Collectors.toList());
+
+        return new JwtAuthenticationToken(jwt, authorities);
     }
 
     private List<String> extractRealmRoles(Jwt jwt) {

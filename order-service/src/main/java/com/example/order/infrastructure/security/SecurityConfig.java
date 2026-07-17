@@ -1,10 +1,10 @@
 package com.example.order.infrastructure.security;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -13,10 +13,13 @@ import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
 
     @Value("${internal.api.key}")
     private String internalApiKey;
+
+    private final JwtClaimsExtractor jwtClaimsExtractor;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -32,8 +35,9 @@ public class SecurityConfig {
                     .hasAnyAuthority("ROLE_USER", "INTERNAL")
                 .anyRequest().authenticated()
             )
-            // JwtClaimsExtractor (a JwtAuthenticationConverter bean) is auto-detected here
-            .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+            .oauth2ResourceServer(oauth2 -> oauth2
+                .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtClaimsExtractor))
+            );
 
         return http.build();
     }

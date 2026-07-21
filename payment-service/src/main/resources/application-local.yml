@@ -4,6 +4,7 @@ internal:
 
 server:
   port: 8082
+
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/payment_db
@@ -17,6 +18,12 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
 management:
   endpoints:
     web:

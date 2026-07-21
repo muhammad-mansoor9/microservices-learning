@@ -1,0 +1,91 @@
+---
+# Ordered deployment: each import_playbook blocks until the previous service
+# passes its health check, so dependent services always start after their
+# dependencies are healthy.
+#
+# Required extra vars (set by Jenkinsfile):
+#   build_number   — Jenkins BUILD_NUMBER, used to locate JARs in S3
+#   s3_bucket      — defaults to ms-learning-artifacts
+#   eureka_host    — private IP of the eureka-server EC2 instance
+#   config_host    — private IP of the config-server EC2 instance
+
+# 1. Config Server — must be up before all other services resolve config
+- import_playbook: deploy-service.yml
+  vars:
+    target_hosts: config_server
+    service_name: config-server
+    service_port: 8888
+    jar_s3_path: "s3://{{ s3_bucket | default('ms-learning-artifacts') }}/{{ build_number }}/config-server.jar"
+    env_vars:
+      SERVER_PORT: "8888"
+      SPRING_PROFILES_ACTIVE: ec2
+      INTERNAL_API_KEY: "{{ internal_api_key }}"
+
+# 2. Eureka Server — service registry; app services register on startup
+- import_playbook: deploy-service.yml
+  vars:
+    target_hosts: eureka_server
+    service_name: eureka-server
+    service_port: 8761
+    jar_s3_path: "s3://{{ s3_bucket | default('ms-learning-artifacts') }}/{{ build_number }}/eureka-server.jar"
+    env_vars:
+      SERVER_PORT: "8761"
+      SPRING_PROFILES_ACTIVE: ec2
+      SPRING_CONFIG_IMPORT: "configserver:http://{{ config_host }}:8888"
+      INTERNAL_API_KEY: "{{ internal_api_key }}"
+
+# 3. User Service
+- import_playbook: deploy-service.yml
+  vars:
+    target_hosts: app_servers
+    service_name: user-service
+    service_port: 8081
+    jar_s3_path: "s3://{{ s3_bucket | default('ms-learning-artifacts') }}/{{ build_number }}/user-service.jar"
+    env_vars:
+      SERVER_PORT: "8081"
+      SPRING_PROFILES_ACTIVE: ec2
+      SPRING_CONFIG_IMPORT: "configserver:http://{{ config_host }}:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://{{ eureka_host }}:8761/eureka"
+      INTERNAL_API_KEY: "{{ internal_api_key }}"
+
+# 4. Payment Service
+- import_playbook: deploy-service.yml
+  vars:
+    target_hosts: app_servers
+    service_name: payment-service
+    service_port: 8082
+    jar_s3_path: "s3://{{ s3_bucket | default('ms-learning-artifacts') }}/{{ build_number }}/payment-service.jar"
+    env_vars:
+      SERVER_PORT: "8082"
+      SPRING_PROFILES_ACTIVE: ec2
+      SPRING_CONFIG_IMPORT: "configserver:http://{{ config_host }}:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://{{ eureka_host }}:8761/eureka"
+      INTERNAL_API_KEY: "{{ internal_api_key }}"
+
+# 5. Order Service
+- import_playbook: deploy-service.yml
+  vars:
+    target_hosts: app_servers
+    service_name: order-service
+    service_port: 8083
+    jar_s3_path: "s3://{{ s3_bucket | default('ms-learning-artifacts') }}/{{ build_number }}/order-service.jar"
+    env_vars:
+      SERVER_PORT: "8083"
+      SPRING_PROFILES_ACTIVE: ec2
+      SPRING_CONFIG_IMPORT: "configserver:http://{{ config_host }}:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://{{ eureka_host }}:8761/eureka"
+      INTERNAL_API_KEY: "{{ internal_api_key }}"
+
+# 6. API Gateway — last; routes all external traffic
+- import_playbook: deploy-service.yml
+  vars:
+    target_hosts: app_servers
+    service_name: api-gateway
+    service_port: 8080
+    jar_s3_path: "s3://{{ s3_bucket | default('ms-learning-artifacts') }}/{{ build_number }}/api-gateway.jar"
+    env_vars:
+      SERVER_PORT: "8080"
+      SPRING_PROFILES_ACTIVE: ec2
+      SPRING_CONFIG_IMPORT: "configserver:http://{{ config_host }}:8888"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://{{ eureka_host }}:8761/eureka"
+      INTERNAL_API_KEY: "{{ internal_api_key }}"

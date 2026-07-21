@@ -1,0 +1,27 @@
+plugin: amazon.aws.aws_ec2
+
+regions:
+  - us-east-1
+
+filters:
+  tag:Project: ms-learning
+  instance-state-name: running
+
+# Map private IPs as the connection address (instances are in private subnets
+# for infrastructure tier; Jenkins bastion or SSM handles access).
+hostnames:
+  - private-ip-address
+
+compose:
+  ansible_user: "'ec2-user'"
+
+# Define clean, hyphen-free group names via host conditions.
+groups:
+  config_server:   "tags.Name == 'ms-learning-config-server'"
+  eureka_server:   "tags.Name == 'ms-learning-eureka-server'"
+  rabbitmq:        "tags.Name == 'ms-learning-rabbitmq'"
+  keycloak:        "tags.Name == 'ms-learning-keycloak'"
+  jenkins:         "tags.Name == 'ms-learning-jenkins'"
+  monitoring:      "tags.Name == 'ms-learning-monitoring'"
+  # ASG instances propagate Name=ms-learning-app-asg
+  app_servers:     "tags.Name == 'ms-learning-app-asg'"

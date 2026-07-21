@@ -5,6 +5,7 @@ networks:
 volumes:
   localstack-data:
   postgres-data:
+  rabbitmq-data:
 
 services:
 
@@ -91,6 +92,26 @@ services:
       timeout: 5s
       retries: 20
       start_period: 90s
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - ms-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   # ── Spring Cloud Infrastructure ─────────────────────────────────────────────
 
@@ -203,6 +224,8 @@ services:
         condition: service_healthy
       eureka-server:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - ms-network
     healthcheck:
@@ -228,13 +251,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      payment-service:
-        condition: service_healthy
       user-service:
         condition: service_healthy
       eureka-server:
         condition: service_healthy
       keycloak:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - ms-network

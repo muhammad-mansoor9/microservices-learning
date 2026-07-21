@@ -6,9 +6,49 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: guest
+    password: guest
   cloud:
     config:
       uri: http://config-server:8888
+    function:
+      definition: paymentApproved;paymentFailed
+    stream:
+      bindings:
+        order-events-out-0:
+          destination: order.events
+        paymentApproved-in-0:
+          destination: payment.events
+          group: order-service-approved
+        paymentFailed-in-0:
+          destination: payment.events
+          group: order-service-failed
+      rabbit:
+        bindings:
+          order-events-out-0:
+            producer:
+              exchange-type: topic
+              routing-key-expression: headers['routingKey']
+          paymentApproved-in-0:
+            consumer:
+              exchange-type: topic
+              binding-routing-key: payment.approved
+              auto-bind-dlq: true
+              dead-letter-queue-name: payment.events.dlq
+          paymentFailed-in-0:
+            consumer:
+              exchange-type: topic
+              binding-routing-key: payment.failed
+              auto-bind-dlq: true
+              dead-letter-queue-name: payment.events.dlq
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI}
 
 services:
   user-service-url: http://user-service:8083
@@ -17,13 +57,6 @@ services:
 internal:
   api:
     key: ${INTERNAL_API_KEY:docker-dev-key}
-
-spring:
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER_URI}
 
 eureka:
   client:

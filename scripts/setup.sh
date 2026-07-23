@@ -52,19 +52,31 @@ AWS_PROFILE=work ansible-playbook \
   -e "db_password=$DB_PASSWORD" \
   -e "keycloak_admin_password=$KC_ADMIN_PASSWORD"
 
-# ---------- 5. Print next steps ----------------------------------------------
+# ---------- 5. Update Jenkinsfile default parameter values -------------------
+echo "Updating Jenkinsfile parameter defaults..."
+JENKINSFILE="$REPO_ROOT/Jenkinsfile"
+KEYCLOAK_ISSUER_URI="http://$KEYCLOAK_HOST:9090/realms/ms-learning"
+
+sed -i.bak \
+  -e "s|defaultValue: '[^']*', description: 'ALB DNS name'|defaultValue: '$ALB_DNS', description: 'ALB DNS name'|" \
+  -e "s|defaultValue: '[^']*', description: 'Eureka private IP'|defaultValue: '$EUREKA_HOST', description: 'Eureka private IP'|" \
+  -e "s|defaultValue: '[^']*', description: 'Config-server private IP'|defaultValue: '$CONFIG_HOST', description: 'Config-server private IP'|" \
+  -e "s|defaultValue: '[^']*', description: 'RabbitMQ private IP'|defaultValue: '$RABBITMQ_HOST', description: 'RabbitMQ private IP'|" \
+  -e "s|defaultValue: '[^']*', description: 'Keycloak private IP'|defaultValue: '$KEYCLOAK_HOST', description: 'Keycloak private IP'|" \
+  -e "s|defaultValue: '[^']*', description: 'PostgreSQL RDS host'|defaultValue: '$RDS_HOST', description: 'PostgreSQL RDS host'|" \
+  -e "s|defaultValue: '[^']*', description: 'Keycloak issuer URI'|defaultValue: '$KEYCLOAK_ISSUER_URI', description: 'Keycloak issuer URI'|" \
+  "$JENKINSFILE"
+rm -f "$JENKINSFILE.bak"
+
+cd "$REPO_ROOT"
+git add Jenkinsfile
+git diff --cached --quiet || git commit -m "chore(jenkins): update parameter defaults from terraform output"
+git push
+
+# ---------- 6. Print next steps ----------------------------------------------
 echo ""
 echo "Infrastructure setup complete!"
 echo ""
 echo "Next: Set up Jenkins"
 echo "  SSH:  ssh -i ~/ms-learning-key.pem ec2-user@$JENKINS_IP"
 echo "  URL:  http://$JENKINS_IP:8080  (after Jenkins is installed)"
-echo ""
-echo "Jenkins pipeline parameter values:"
-echo "  ALB_DNS             = $ALB_DNS"
-echo "  EUREKA_HOST         = $EUREKA_HOST"
-echo "  CONFIG_HOST         = $CONFIG_HOST"
-echo "  RABBITMQ_HOST       = $RABBITMQ_HOST"
-echo "  KEYCLOAK_HOST       = $KEYCLOAK_HOST"
-echo "  DB_HOST             = $RDS_HOST"
-echo "  KEYCLOAK_ISSUER_URI = http://$KEYCLOAK_HOST:9090/realms/ms-learning"

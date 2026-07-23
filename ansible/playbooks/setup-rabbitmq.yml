@@ -1,64 +1,39 @@
 ---
-- name: Install and configure RabbitMQ
+- name: Install and configure RabbitMQ (Docker)
   hosts: rabbitmq
   become: true
 
-  vars:
-    erlang_version: "26.2.5.4"
-    rabbitmq_version: "3.13.7"
-
   tasks:
-    - name: Install socat (required by RabbitMQ)
+    - name: Install Docker
       ansible.builtin.dnf:
-        name: socat
+        name: docker
         state: present
 
-    - name: Download Erlang RPM from GitHub
-      ansible.builtin.get_url:
-        url: "https://github.com/rabbitmq/erlang-rpm/releases/download/v{{ erlang_version }}/erlang-{{ erlang_version }}-1.el8.x86_64.rpm"
-        dest: /tmp/erlang.rpm
-        mode: "0644"
-
-    - name: Download RabbitMQ server RPM from GitHub
-      ansible.builtin.get_url:
-        url: "https://github.com/rabbitmq/rabbitmq-server/releases/download/v{{ rabbitmq_version }}/rabbitmq-server-{{ rabbitmq_version }}-1.el8.noarch.rpm"
-        dest: /tmp/rabbitmq-server.rpm
-        mode: "0644"
-
-    - name: Install Erlang and RabbitMQ from downloaded RPMs
-      ansible.builtin.dnf:
-        name:
-          - /tmp/erlang.rpm
-          - /tmp/rabbitmq-server.rpm
-        state: present
-        disable_gpg_check: true
-
-    - name: Write rabbitmq.conf (allow guest from non-localhost for dev)
-      ansible.builtin.copy:
-        dest: /etc/rabbitmq/rabbitmq.conf
-        mode: "0644"
-        content: |
-          loopback_users.guest = false
-          management.listener.port = 15672
-
-    - name: Enable and start RabbitMQ
+    - name: Start and enable Docker
       ansible.builtin.systemd:
-        name: rabbitmq-server
+        name: docker
         state: started
         enabled: true
 
-    - name: Enable management UI plugin
-      ansible.builtin.command: rabbitmq-plugins enable rabbitmq_management
-      changed_when: true
-      notify: Restart RabbitMQ
+    - name: Pull RabbitMQ management image
+      ansible.builtin.command: docker pull rabbitmq:3-management
+      changed_when: false
+
+    - name: Run RabbitMQ container (idempotent)
+      ansible.builtin.shell: |
+        if ! docker ps -a --format '{{ '{{' }}.Names{{ '}}' }}' | grep -q '^rabbitmq$'; then
+          docker run -d \
+            --name rabbitmq \
+            --restart always \
+            -p 5672:5672 \
+            -p 15672:15672 \
+            rabbitmq:3-management
+        elif ! docker ps --format '{{ '{{' }}.Names{{ '}}' }}' | grep -q '^rabbitmq$'; then
+          docker start rabbitmq
+        fi
+      changed_when: false
 
     - name: Wait for RabbitMQ AMQP port to be ready
       ansible.builtin.wait_for:
         port: 5672
         timeout: 60
-
-  handlers:
-    - name: Restart RabbitMQ
-      ansible.builtin.systemd:
-        name: rabbitmq-server
-        state: restarted

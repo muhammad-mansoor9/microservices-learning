@@ -56,6 +56,24 @@
         name: jenkins
         state: present
 
+    - name: Create Jenkins systemd override directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/jenkins.service.d
+        state: directory
+        mode: "0755"
+
+    - name: Set JAVA_HOME for Jenkins service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/jenkins.service.d/override.conf
+        mode: "0644"
+        content: |
+          [Service]
+          Environment="JAVA_HOME=/usr/lib/jvm/java-21-amazon-corretto"
+
+    - name: Reload systemd after override
+      ansible.builtin.systemd:
+        daemon_reload: true
+
     - name: Start and enable Jenkins
       ansible.builtin.systemd:
         name: jenkins

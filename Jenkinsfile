@@ -5,6 +5,7 @@ pipeline {
         AWS_REGION  = 'us-east-1'
         S3_BUCKET   = 'ms-learning-artifacts'
         ANSIBLE_DIR = "${WORKSPACE}/ansible"
+        JAVA_HOME   = '/usr/lib/jvm/java-21-amazon-corretto'
     }
 
     parameters {

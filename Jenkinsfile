@@ -100,7 +100,8 @@ pipeline {
                             -e db_host=${params.DB_HOST} \
                             -e db_password=\$DB_PASSWORD \
                             -e keycloak_issuer_uri=${params.KEYCLOAK_ISSUER_URI} \
-                            -e config_repo_uri=${params.CONFIG_REPO_URI}
+                            -e config_repo_uri=${params.CONFIG_REPO_URI} \
+                            -e "ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'"
                     """
                 }
             }

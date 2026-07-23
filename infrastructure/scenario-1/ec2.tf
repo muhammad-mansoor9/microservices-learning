@@ -68,6 +68,18 @@ resource "aws_autoscaling_group" "app" {
     value               = "ms-learning-app-asg"
     propagate_at_launch = true
   }
+
+  tag {
+    key                 = "Project"
+    value               = "ms-learning"
+    propagate_at_launch = true
+  }
+
+  tag {
+    key                 = "Scenario"
+    value               = "ec2"
+    propagate_at_launch = true
+  }
 }
 
 # Eureka Server (private subnet)

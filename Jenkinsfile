@@ -112,9 +112,9 @@ pipeline {
                 sh """
                     echo "Waiting 60s for Eureka registration to propagate..."
                     sleep 60
-                    echo "Smoke test → http://${params.ALB_DNS}/api/orders/actuator/health"
+                    echo "Smoke test → http://${params.ALB_DNS}/actuator/health"
                     HTTP_STATUS=\$(curl -s -o /dev/null -w "%{http_code}" \
-                        http://${params.ALB_DNS}/api/orders/actuator/health)
+                        http://${params.ALB_DNS}/actuator/health)
                     echo "Response: \${HTTP_STATUS}"
                     if [ "\${HTTP_STATUS}" != "200" ]; then
                         echo "FAILED — expected 200, got \${HTTP_STATUS}"

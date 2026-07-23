@@ -1,0 +1,4 @@
+# App servers are in the public subnet but Jenkins reaches them via private IP
+# because the security group (app-sg) only allows SSH from jenkins-sg within the VPC.
+ansible_host: "{{ private_ip_address }}"
+ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"

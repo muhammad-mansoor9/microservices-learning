@@ -1,98 +1,48 @@
 ---
-- name: Install and configure Keycloak
+- name: Install and configure Keycloak (Docker)
   hosts: keycloak
   become: true
 
   vars:
-    keycloak_version: "26.0.2"
-    keycloak_home: /opt/keycloak
     keycloak_admin_user: admin
     # keycloak_admin_password — pass via extra var: -e keycloak_admin_password=...
 
   tasks:
-    - name: Create keycloak system user
-      ansible.builtin.user:
-        name: keycloak
-        system: true
-        shell: /sbin/nologin
-        create_home: false
+    - name: Install Docker
+      ansible.builtin.dnf:
+        name: docker
+        state: present
 
-    - name: Download Keycloak {{ keycloak_version }}
-      ansible.builtin.get_url:
-        url: "https://github.com/keycloak/keycloak/releases/download/{{ keycloak_version }}/keycloak-{{ keycloak_version }}.tar.gz"
-        dest: /tmp/keycloak.tar.gz
-        mode: "0644"
-
-    - name: Extract Keycloak
-      ansible.builtin.unarchive:
-        src: /tmp/keycloak.tar.gz
-        dest: /opt
-        remote_src: true
-        creates: "/opt/keycloak-{{ keycloak_version }}"
-
-    - name: Create /opt/keycloak symlink
-      ansible.builtin.file:
-        src: "/opt/keycloak-{{ keycloak_version }}"
-        dest: "{{ keycloak_home }}"
-        state: link
-
-    - name: Create realm import directory
-      ansible.builtin.file:
-        path: "{{ keycloak_home }}/data/import"
-        state: directory
-        owner: keycloak
-        mode: "0755"
+    - name: Start and enable Docker
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
 
     - name: Copy ms-learning realm JSON
       ansible.builtin.copy:
         src: "{{ playbook_dir }}/../../infrastructure/keycloak/ms-learning-realm.json"
-        dest: "{{ keycloak_home }}/data/import/ms-learning-realm.json"
-        owner: keycloak
+        dest: /opt/ms-learning-realm.json
         mode: "0644"
 
-    - name: Set Keycloak directory ownership
-      ansible.builtin.file:
-        path: "{{ keycloak_home }}"
-        owner: keycloak
-        group: keycloak
-        recurse: true
+    - name: Run Keycloak container (idempotent)
+      ansible.builtin.shell: |
+        if ! docker ps -a --format '{{ '{{' }}.Names{{ '}}' }}' | grep -q '^keycloak$'; then
+          docker run -d \
+            --name keycloak \
+            --restart always \
+            -p 9090:8080 \
+            -e KEYCLOAK_ADMIN={{ keycloak_admin_user }} \
+            -e KEYCLOAK_ADMIN_PASSWORD={{ keycloak_admin_password }} \
+            -v /opt/ms-learning-realm.json:/opt/keycloak/data/import/ms-learning-realm.json:ro \
+            quay.io/keycloak/keycloak:26.0.2 \
+            start-dev --import-realm
+        elif ! docker ps --format '{{ '{{' }}.Names{{ '}}' }}' | grep -q '^keycloak$'; then
+          docker start keycloak
+        fi
+      changed_when: false
 
-    - name: Create Keycloak systemd service
-      ansible.builtin.copy:
-        dest: /etc/systemd/system/keycloak.service
-        mode: "0644"
-        content: |
-          [Unit]
-          Description=Keycloak Identity Provider
-          After=network.target
-
-          [Service]
-          User=keycloak
-          Environment=KEYCLOAK_ADMIN={{ keycloak_admin_user }}
-          Environment=KEYCLOAK_ADMIN_PASSWORD={{ keycloak_admin_password }}
-          Environment=KC_HTTP_PORT=9090
-          ExecStart={{ keycloak_home }}/bin/kc.sh start-dev \
-            --http-port=9090 \
-            --import-realm
-          Restart=always
-          RestartSec=10
-          StandardOutput=journal
-          StandardError=journal
-
-          [Install]
-          WantedBy=multi-user.target
-
-    - name: Reload systemd
-      ansible.builtin.systemd:
-        daemon_reload: true
-
-    - name: Enable and start Keycloak
-      ansible.builtin.systemd:
-        name: keycloak
-        state: started
-        enabled: true
-
-    - name: Wait for Keycloak to respond on port 9090 (can take ~60 s)
+    - name: Wait for Keycloak to respond on port 9090 (can take ~90 s)
       ansible.builtin.wait_for:
         port: 9090
         timeout: 120

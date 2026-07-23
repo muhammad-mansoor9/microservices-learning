@@ -19,6 +19,16 @@
     env_vars: {}
 
   tasks:
+    - name: Install Java 21 (Corretto)
+      ansible.builtin.dnf:
+        name: java-21-amazon-corretto-headless
+        state: present
+
+    - name: Install AWS CLI (needed to pull JARs from S3)
+      ansible.builtin.dnf:
+        name: awscli
+        state: present
+
     - name: Ensure service directory exists
       ansible.builtin.file:
         path: "{{ deploy_dir }}/{{ service_name }}"
@@ -53,7 +63,7 @@
           [Service]
           User={{ app_user }}
           WorkingDirectory={{ deploy_dir }}/{{ service_name }}
-          ExecStart=/usr/bin/java -jar {{ deploy_dir }}/{{ service_name }}/app.jar
+          ExecStart=/usr/lib/jvm/java-21-amazon-corretto/bin/java -jar {{ deploy_dir }}/{{ service_name }}/app.jar
           {% for key, value in env_vars.items() %}
           Environment="{{ key }}={{ value }}"
           {% endfor %}

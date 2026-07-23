@@ -8,15 +8,14 @@ pipeline {
     }
 
     parameters {
-        // --- Infrastructure IPs (copy from: terraform output) ---
-        string(name: 'ALB_DNS',             description: 'ALB DNS name          → terraform output alb_dns_name')
-        string(name: 'EUREKA_HOST',         description: 'Eureka private IP      → terraform output eureka_server_private_ip')
-        string(name: 'CONFIG_HOST',         description: 'Config-server priv IP  → terraform output config_server_private_ip')
-        string(name: 'RABBITMQ_HOST',       description: 'RabbitMQ private IP    → terraform output rabbitmq_private_ip')
-        string(name: 'KEYCLOAK_HOST',       description: 'Keycloak private IP    → terraform output keycloak_private_ip')
-        string(name: 'DB_HOST',             description: 'PostgreSQL host IP     (same instance as app, or a dedicated server)')
-        string(name: 'KEYCLOAK_ISSUER_URI', description: 'Keycloak issuer URI    e.g. http://<keycloak-ip>:9090/realms/ms-learning')
-        string(name: 'CONFIG_REPO_URI',     description: 'Git URI for Spring Cloud Config prod files (e.g. https://github.com/you/config-repo)')
+        string(name: 'ALB_DNS',             defaultValue: 'ms-learning-alb-287042979.us-east-1.elb.amazonaws.com', description: 'ALB DNS name')
+        string(name: 'EUREKA_HOST',         defaultValue: '10.0.3.25',    description: 'Eureka private IP')
+        string(name: 'CONFIG_HOST',         defaultValue: '10.0.3.136',   description: 'Config-server private IP')
+        string(name: 'RABBITMQ_HOST',       defaultValue: '10.0.4.158',   description: 'RabbitMQ private IP')
+        string(name: 'KEYCLOAK_HOST',       defaultValue: '10.0.4.199',   description: 'Keycloak private IP')
+        string(name: 'DB_HOST',             defaultValue: 'ms-learning-postgres.c8xm6w2gsz3i.us-east-1.rds.amazonaws.com', description: 'PostgreSQL RDS host')
+        string(name: 'KEYCLOAK_ISSUER_URI', defaultValue: 'http://10.0.4.199:9090/realms/ms-learning', description: 'Keycloak issuer URI')
+        string(name: 'CONFIG_REPO_URI',     defaultValue: 'https://github.com/muhammad-mansoor9/ms-learning-config-repo', description: 'Spring Cloud Config git repo')
     }
 
     stages {

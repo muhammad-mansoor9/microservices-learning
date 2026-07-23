@@ -36,8 +36,7 @@
         executable: pip3
 
     - name: Install amazon.aws Ansible collection
-      ansible.builtin.command: ansible-galaxy collection install amazon.aws
-      become: false
+      ansible.builtin.command: /usr/local/bin/ansible-galaxy collection install amazon.aws
       changed_when: false
 
     - name: Add Jenkins repo

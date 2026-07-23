@@ -3,45 +3,35 @@
   hosts: rabbitmq
   become: true
 
+  vars:
+    erlang_version: "26.2.5.4"
+    rabbitmq_version: "3.13.7"
+
   tasks:
-    - name: Write Erlang repo for RHEL9 / Amazon Linux 2023
-      ansible.builtin.copy:
-        dest: /etc/yum.repos.d/rabbitmq-erlang.repo
-        mode: "0644"
-        content: |
-          [rabbitmq-el9-erlang]
-          name=Erlang for RabbitMQ (el9 / Amazon Linux 2023)
-          baseurl=https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/rpm/el/9/$basearch
-          gpgcheck=1
-          gpgkey=https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/gpg.E495BB49CC4BBE5B.key
-          repo_gpgcheck=0
-          enabled=1
-          sslverify=1
-          sslcacert=/etc/pki/tls/certs/ca-bundle.crt
-          metadata_expire=300
+    - name: Install socat (required by RabbitMQ)
+      ansible.builtin.dnf:
+        name: socat
+        state: present
 
-    - name: Write RabbitMQ server repo for RHEL9 / Amazon Linux 2023
-      ansible.builtin.copy:
-        dest: /etc/yum.repos.d/rabbitmq-server.repo
+    - name: Download Erlang RPM from GitHub
+      ansible.builtin.get_url:
+        url: "https://github.com/rabbitmq/erlang-rpm/releases/download/v{{ erlang_version }}/erlang-{{ erlang_version }}-1.el8.x86_64.rpm"
+        dest: /tmp/erlang.rpm
         mode: "0644"
-        content: |
-          [rabbitmq-server]
-          name=RabbitMQ Server (el9 / Amazon Linux 2023)
-          baseurl=https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/rpm/el/9/$basearch
-          gpgcheck=1
-          gpgkey=https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/gpg.9F4587D7.key
-          repo_gpgcheck=0
-          enabled=1
-          sslverify=1
-          sslcacert=/etc/pki/tls/certs/ca-bundle.crt
-          metadata_expire=300
 
-    - name: Install Erlang and RabbitMQ
+    - name: Download RabbitMQ server RPM from GitHub
+      ansible.builtin.get_url:
+        url: "https://github.com/rabbitmq/rabbitmq-server/releases/download/v{{ rabbitmq_version }}/rabbitmq-server-{{ rabbitmq_version }}-1.el8.noarch.rpm"
+        dest: /tmp/rabbitmq-server.rpm
+        mode: "0644"
+
+    - name: Install Erlang and RabbitMQ from downloaded RPMs
       ansible.builtin.dnf:
         name:
-          - erlang
-          - rabbitmq-server
+          - /tmp/erlang.rpm
+          - /tmp/rabbitmq-server.rpm
         state: present
+        disable_gpg_check: true
 
     - name: Write rabbitmq.conf (allow guest from non-localhost for dev)
       ansible.builtin.copy:

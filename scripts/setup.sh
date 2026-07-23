@@ -40,10 +40,16 @@ eval "$(ssh-agent -s)"
 ssh-add ~/ms-learning-key.pem
 trap 'ssh-agent -k' EXIT   # kill agent when this script exits
 
-# ---------- 4. Run Ansible setup-infra ---------------------------------------
-echo "Running setup-infra playbook..."
+# ---------- 4. Run Ansible playbooks -----------------------------------------
 cd "$REPO_ROOT"
 
+echo "Running setup-jenkins playbook..."
+AWS_PROFILE=work ansible-playbook \
+  -i "$ANSIBLE_DIR/inventory.aws_ec2.yml" \
+  "$ANSIBLE_DIR/playbooks/setup-jenkins.yml" \
+  --private-key ~/ms-learning-key.pem
+
+echo "Running setup-infra playbook..."
 AWS_PROFILE=work ansible-playbook \
   -i "$ANSIBLE_DIR/inventory.aws_ec2.yml" \
   "$ANSIBLE_DIR/playbooks/setup-infra.yml" \

@@ -1,0 +1,77 @@
+---
+- name: Install and configure Jenkins with all build dependencies
+  hosts: jenkins
+  become: true
+
+  tasks:
+    - name: Install Java, Git, Maven
+      ansible.builtin.dnf:
+        name:
+          - java-21-amazon-corretto-headless
+          - git
+          - maven
+        state: present
+
+    - name: Install pip and Python deps for Ansible AWS dynamic inventory
+      ansible.builtin.dnf:
+        name:
+          - python3-pip
+        state: present
+
+    - name: Install boto3 and botocore for Ansible AWS modules
+      ansible.builtin.pip:
+        name:
+          - boto3
+          - botocore
+        executable: pip3
+
+    - name: Install AWS CLI
+      ansible.builtin.dnf:
+        name: awscli
+        state: present
+
+    - name: Install Ansible
+      ansible.builtin.pip:
+        name: ansible
+        executable: pip3
+
+    - name: Install amazon.aws Ansible collection
+      ansible.builtin.command: ansible-galaxy collection install amazon.aws
+      become: false
+      changed_when: false
+
+    - name: Add Jenkins repo
+      ansible.builtin.get_url:
+        url: https://pkg.jenkins.io/redhat-stable/jenkins.repo
+        dest: /etc/yum.repos.d/jenkins.repo
+        mode: "0644"
+
+    - name: Import Jenkins RPM key
+      ansible.builtin.rpm_key:
+        key: https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
+        state: present
+
+    - name: Install Jenkins
+      ansible.builtin.dnf:
+        name: jenkins
+        state: present
+
+    - name: Start and enable Jenkins
+      ansible.builtin.systemd:
+        name: jenkins
+        state: started
+        enabled: true
+
+    - name: Wait for Jenkins to start on port 8080
+      ansible.builtin.wait_for:
+        port: 8080
+        timeout: 60
+
+    - name: Print Jenkins initial admin password
+      ansible.builtin.command: cat /var/lib/jenkins/secrets/initialAdminPassword
+      register: jenkins_password
+      changed_when: false
+
+    - name: Show Jenkins initial admin password
+      ansible.builtin.debug:
+        msg: "Jenkins initial admin password: {{ jenkins_password.stdout }}"

@@ -25,6 +25,10 @@ resource "aws_launch_template" "app" {
 
   vpc_security_group_ids = [aws_security_group.app.id]
 
+  iam_instance_profile {
+    name = aws_iam_instance_profile.ec2.name
+  }
+
   tag_specifications {
     resource_type = "instance"
     tags          = { Name = "ms-learning-app" }
@@ -65,6 +69,7 @@ resource "aws_instance" "eureka_server" {
   subnet_id              = aws_subnet.private_a.id
   key_name               = "ms-learning-key"
   vpc_security_group_ids = [aws_security_group.app.id]
+  iam_instance_profile   = aws_iam_instance_profile.ec2.name
 
   tags = { Name = "ms-learning-eureka-server" }
 }
@@ -77,6 +82,7 @@ resource "aws_instance" "config_server" {
   subnet_id              = aws_subnet.private_a.id
   key_name               = "ms-learning-key"
   vpc_security_group_ids = [aws_security_group.app.id]
+  iam_instance_profile   = aws_iam_instance_profile.ec2.name
 
   tags = { Name = "ms-learning-config-server" }
 }
@@ -89,6 +95,7 @@ resource "aws_instance" "rabbitmq" {
   subnet_id              = aws_subnet.private_b.id
   key_name               = "ms-learning-key"
   vpc_security_group_ids = [aws_security_group.infra.id]
+  iam_instance_profile   = aws_iam_instance_profile.ec2.name
 
   tags = { Name = "ms-learning-rabbitmq" }
 }
@@ -101,6 +108,7 @@ resource "aws_instance" "keycloak" {
   subnet_id              = aws_subnet.private_b.id
   key_name               = "ms-learning-key"
   vpc_security_group_ids = [aws_security_group.infra.id]
+  iam_instance_profile   = aws_iam_instance_profile.ec2.name
 
   tags = { Name = "ms-learning-keycloak" }
 }
@@ -114,6 +122,7 @@ resource "aws_instance" "jenkins" {
   key_name                    = "ms-learning-key"
   vpc_security_group_ids      = [aws_security_group.jenkins.id]
   associate_public_ip_address = true
+  iam_instance_profile        = aws_iam_instance_profile.ec2.name
 
   tags = { Name = "ms-learning-jenkins" }
 }
@@ -127,6 +136,7 @@ resource "aws_instance" "monitoring" {
   key_name                    = "ms-learning-key"
   vpc_security_group_ids      = [aws_security_group.monitoring.id]
   associate_public_ip_address = true
+  iam_instance_profile        = aws_iam_instance_profile.ec2.name
 
   tags = { Name = "ms-learning-monitoring" }
 }

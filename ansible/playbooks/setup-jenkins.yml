@@ -18,25 +18,22 @@
           - python3-pip
         state: present
 
-    - name: Install boto3 and botocore for Ansible AWS modules
+    - name: Install Ansible, boto3, botocore system-wide
       ansible.builtin.pip:
         name:
+          - ansible
           - boto3
           - botocore
         executable: pip3
+        extra_args: --prefix /usr/local
 
     - name: Install AWS CLI
       ansible.builtin.dnf:
         name: awscli
         state: present
 
-    - name: Install Ansible
-      ansible.builtin.pip:
-        name: ansible
-        executable: pip3
-
-    - name: Install amazon.aws Ansible collection
-      ansible.builtin.command: /usr/local/bin/ansible-galaxy collection install amazon.aws
+    - name: Install amazon.aws Ansible collection system-wide
+      ansible.builtin.command: /usr/local/bin/ansible-galaxy collection install amazon.aws --collections-path /usr/share/ansible/collections
       changed_when: false
 
     - name: Add Jenkins repo

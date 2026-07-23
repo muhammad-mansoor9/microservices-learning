@@ -37,3 +37,13 @@ output "monitoring_public_ip" {
   description = "Public IP of the Monitoring instance"
   value       = aws_instance.monitoring.public_ip
 }
+
+output "rds_endpoint" {
+  description = "RDS PostgreSQL endpoint (host:port) — use as DB_URL host in Ansible"
+  value       = aws_db_instance.postgres.endpoint
+}
+
+output "rds_host" {
+  description = "RDS hostname only (without port)"
+  value       = aws_db_instance.postgres.address
+}

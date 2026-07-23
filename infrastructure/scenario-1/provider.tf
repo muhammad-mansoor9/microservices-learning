@@ -25,8 +25,21 @@ variable "my_ip" {
   type        = string
 }
 
+variable "aws_profile" {
+  description = "AWS CLI profile to use (leave empty to use the default profile or AWS_PROFILE env var)"
+  type        = string
+  default     = ""
+}
+
+variable "db_password" {
+  description = "Master password for the RDS PostgreSQL instance"
+  type        = string
+  sensitive   = true
+}
+
 provider "aws" {
-  region = var.aws_region
+  region  = var.aws_region
+  profile = var.aws_profile != "" ? var.aws_profile : null
 
   default_tags {
     tags = {

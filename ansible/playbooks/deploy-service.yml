@@ -1,0 +1,89 @@
+---
+# Standalone usage:
+#   ansible-playbook deploy-service.yml \
+#     -e "target_hosts=app_servers" \
+#     -e "service_name=order-service" \
+#     -e "service_port=8083" \
+#     -e "jar_s3_path=s3://ms-learning-artifacts/42/order-service.jar" \
+#     -e '{"env_vars": {"SERVER_PORT": "8083", "SPRING_PROFILES_ACTIVE": "ec2"}}'
+
+- name: Deploy {{ service_name }}
+  hosts: "{{ target_hosts }}"
+  become: true
+  gather_facts: false
+
+  vars:
+    service_name: ""
+    service_port: 8080
+    jar_s3_path: ""
+    env_vars: {}
+
+  tasks:
+    - name: Ensure service directory exists
+      ansible.builtin.file:
+        path: "{{ deploy_dir }}/{{ service_name }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0755"
+
+    - name: Download JAR from S3
+      ansible.builtin.command:
+        cmd: >
+          aws s3 cp {{ jar_s3_path }}
+          {{ deploy_dir }}/{{ service_name }}/app.jar
+      changed_when: true
+
+    - name: Set JAR ownership
+      ansible.builtin.file:
+        path: "{{ deploy_dir }}/{{ service_name }}/app.jar"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0644"
+
+    - name: Write systemd unit file
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/{{ service_name }}.service
+        mode: "0644"
+        content: |
+          [Unit]
+          Description={{ service_name }} microservice
+          After=network.target
+
+          [Service]
+          User={{ app_user }}
+          WorkingDirectory={{ deploy_dir }}/{{ service_name }}
+          ExecStart=/usr/bin/java -jar {{ deploy_dir }}/{{ service_name }}/app.jar
+          {% for key, value in env_vars.items() %}
+          Environment="{{ key }}={{ value }}"
+          {% endfor %}
+          Restart=always
+          RestartSec=5
+          StandardOutput=journal
+          StandardError=journal
+          SyslogIdentifier={{ service_name }}
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Enable and restart service
+      ansible.builtin.systemd:
+        name: "{{ service_name }}"
+        state: restarted
+        enabled: true
+
+    - name: Wait for /actuator/health to return 200 (timeout 60 s)
+      ansible.builtin.uri:
+        url: "http://localhost:{{ service_port }}/actuator/health"
+        method: GET
+        status_code: 200
+        return_content: false
+      register: health_result
+      until: health_result.status == 200
+      retries: 12       # 12 × 5 s = 60 s
+      delay: 5
+      failed_when: health_result.status != 200

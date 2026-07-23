@@ -1,0 +1,4 @@
+java_version: 21
+app_user: ec2-user
+deploy_dir: /opt/apps
+internal_api_key: "{{ lookup('env', 'INTERNAL_API_KEY') }}"

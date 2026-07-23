@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
-# -----------------------------------------------------------------------------
-# setup.sh — Run after every terraform apply.
-# Reads Terraform outputs, then runs the setup-infra Ansible playbook which:
-#   1. Installs Java 21 on all instances
-#   2. Installs and configures RabbitMQ
-#   3. Installs and configures Keycloak (imports ms-learning realm)
-#   4. Creates order_db and payment_db on RDS
-# -----------------------------------------------------------------------------
+# Run this after every terraform apply.
+# Reads Terraform outputs → runs setup-infra Ansible playbook.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -40,9 +34,13 @@ read -rsp "DB password (same as terraform apply): " DB_PASSWORD; echo
 read -rsp "Keycloak admin password (choose one):  " KC_ADMIN_PASSWORD; echo
 echo ""
 
-# ---------- 3. Run Ansible setup-infra ---------------------------------------
-# JENKINS_IP is exported above so group_vars/private_hosts.yml can use it
-# for the ProxyJump SSH args.
+# ---------- 3. Add SSH key to agent for ProxyCommand key forwarding ----------
+echo "Adding SSH key to agent..."
+eval "$(ssh-agent -s)"
+ssh-add ~/ms-learning-key.pem
+trap 'ssh-agent -k' EXIT   # kill agent when this script exits
+
+# ---------- 4. Run Ansible setup-infra ---------------------------------------
 echo "Running setup-infra playbook..."
 cd "$REPO_ROOT"
 
@@ -54,18 +52,19 @@ AWS_PROFILE=work ansible-playbook \
   -e "db_password=$DB_PASSWORD" \
   -e "keycloak_admin_password=$KC_ADMIN_PASSWORD"
 
-# ---------- 4. Print next steps ----------------------------------------------
+# ---------- 5. Print next steps ----------------------------------------------
 echo ""
 echo "Infrastructure setup complete!"
 echo ""
-echo "Next steps:"
-echo "  1. Set up Jenkins:  ssh -i ~/ms-learning-key.pem ec2-user@$JENKINS_IP"
-echo "  2. Jenkins URL:     http://$JENKINS_IP:8080"
-echo "  3. Use these values when configuring the Jenkins pipeline parameters:"
-echo "       ALB_DNS            = $ALB_DNS"
-echo "       EUREKA_HOST        = $EUREKA_HOST"
-echo "       CONFIG_HOST        = $CONFIG_HOST"
-echo "       RABBITMQ_HOST      = $RABBITMQ_HOST"
-echo "       KEYCLOAK_HOST      = $KEYCLOAK_HOST"
-echo "       DB_HOST            = $RDS_HOST"
-echo "       KEYCLOAK_ISSUER_URI = http://$KEYCLOAK_HOST:9090/realms/ms-learning"
+echo "Next: Set up Jenkins"
+echo "  SSH:  ssh -i ~/ms-learning-key.pem ec2-user@$JENKINS_IP"
+echo "  URL:  http://$JENKINS_IP:8080  (after Jenkins is installed)"
+echo ""
+echo "Jenkins pipeline parameter values:"
+echo "  ALB_DNS             = $ALB_DNS"
+echo "  EUREKA_HOST         = $EUREKA_HOST"
+echo "  CONFIG_HOST         = $CONFIG_HOST"
+echo "  RABBITMQ_HOST       = $RABBITMQ_HOST"
+echo "  KEYCLOAK_HOST       = $KEYCLOAK_HOST"
+echo "  DB_HOST             = $RDS_HOST"
+echo "  KEYCLOAK_ISSUER_URI = http://$KEYCLOAK_HOST:9090/realms/ms-learning"

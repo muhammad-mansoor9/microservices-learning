@@ -7,13 +7,15 @@ filters:
   tag:Project: ms-learning
   instance-state-name: running
 
+# Use public IP when the instance has one (public subnet), fall back to
+# private IP (private subnet instances — reached via ProxyJump from Jenkins).
 hostnames:
+  - ip-address
   - private-ip-address
 
 compose:
   ansible_user: "'ec2-user'"
 
-# Named groups by instance role
 groups:
   config_server:   "tags.Name == 'ms-learning-config-server'"
   eureka_server:   "tags.Name == 'ms-learning-eureka-server'"
@@ -23,7 +25,7 @@ groups:
   monitoring:      "tags.Name == 'ms-learning-monitoring'"
   app_servers:     "tags.Name == 'ms-learning-app-asg'"
 
-  # Private-subnet instances — Ansible reaches these via Jenkins ProxyJump.
+  # These four have no public IP — Ansible reaches them via Jenkins ProxyCommand.
   # group_vars/private_hosts.yml sets ansible_ssh_common_args for this group.
   private_hosts: >-
     tags.Name in [
@@ -33,7 +35,7 @@ groups:
       'ms-learning-keycloak'
     ]
 
-  # Public-subnet instances — directly reachable via SSH.
+  # Directly reachable via their public IPs.
   public_hosts: >-
     tags.Name in [
       'ms-learning-jenkins',

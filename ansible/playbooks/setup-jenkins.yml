@@ -19,21 +19,25 @@
         state: present
 
     - name: Install Ansible, boto3, botocore system-wide
-      ansible.builtin.pip:
-        name:
-          - ansible
-          - boto3
-          - botocore
-        executable: pip3
-        extra_args: --prefix /usr/local
+      ansible.builtin.shell: pip3 install --upgrade ansible boto3 botocore
+      changed_when: false
+
+    - name: Symlink ansible binaries to /usr/local/bin for all users
+      ansible.builtin.shell: |
+        for bin in ansible ansible-playbook ansible-galaxy; do
+          src=$(pip3 show ansible 2>/dev/null | grep Location | awk '{print $2}')/../bin/$bin
+          ln -sf $(which $bin || echo /usr/local/lib/python*/dist-packages/../../../bin/$bin) /usr/local/bin/$bin 2>/dev/null || true
+          ln -sf ~/.local/bin/$bin /usr/local/bin/$bin 2>/dev/null || true
+        done
+      changed_when: false
 
     - name: Install AWS CLI
       ansible.builtin.dnf:
         name: awscli
         state: present
 
-    - name: Install amazon.aws Ansible collection system-wide
-      ansible.builtin.command: /usr/local/bin/ansible-galaxy collection install amazon.aws --collections-path /usr/share/ansible/collections
+    - name: Install amazon.aws Ansible collection
+      ansible.builtin.shell: ansible-galaxy collection install amazon.aws
       changed_when: false
 
     - name: Add Jenkins repo

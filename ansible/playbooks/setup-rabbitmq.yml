@@ -1,0 +1,54 @@
+---
+- name: Install and configure RabbitMQ
+  hosts: rabbitmq
+  become: true
+
+  tasks:
+    - name: Add RabbitMQ Erlang CloudSmith repo
+      ansible.builtin.shell:
+        cmd: curl -1sLf 'https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/setup.rpm.sh' | bash
+        creates: /etc/yum.repos.d/rabbitmq_rabbitmq-erlang.repo
+
+    - name: Add RabbitMQ server CloudSmith repo
+      ansible.builtin.shell:
+        cmd: curl -1sLf 'https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/setup.rpm.sh' | bash
+        creates: /etc/yum.repos.d/rabbitmq_rabbitmq-server.repo
+
+    - name: Install Erlang and RabbitMQ
+      ansible.builtin.dnf:
+        name:
+          - erlang
+          - rabbitmq-server
+        state: present
+
+    - name: Write rabbitmq.conf (allow guest from non-localhost for dev)
+      ansible.builtin.copy:
+        dest: /etc/rabbitmq/rabbitmq.conf
+        mode: "0644"
+        content: |
+          # Allow the default guest user to connect from any IP.
+          # Acceptable for a learning environment — restrict in production.
+          loopback_users.guest = false
+          management.listener.port = 15672
+
+    - name: Enable and start RabbitMQ
+      ansible.builtin.systemd:
+        name: rabbitmq-server
+        state: started
+        enabled: true
+
+    - name: Enable management UI plugin
+      ansible.builtin.command: rabbitmq-plugins enable rabbitmq_management
+      changed_when: true
+      notify: Restart RabbitMQ
+
+    - name: Wait for RabbitMQ AMQP port to be ready
+      ansible.builtin.wait_for:
+        port: 5672
+        timeout: 60
+
+  handlers:
+    - name: Restart RabbitMQ
+      ansible.builtin.systemd:
+        name: rabbitmq-server
+        state: restarted

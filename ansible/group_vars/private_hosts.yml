@@ -1,0 +1,8 @@
+# Applied to all private-subnet instances (config_server, eureka_server, rabbitmq, keycloak).
+# Jenkins is used as a ProxyJump host so Ansible can reach them from your laptop.
+# JENKINS_IP is exported by scripts/setup.sh before ansible-playbook runs.
+ansible_ssh_common_args: >-
+  -o StrictHostKeyChecking=no
+  -o UserKnownHostsFile=/dev/null
+  -o ProxyJump=ec2-user@{{ lookup('env', 'JENKINS_IP') }}
+  -i ~/ms-learning-key.pem

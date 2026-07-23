@@ -54,6 +54,14 @@ resource "aws_security_group" "app" {
     cidr_blocks = [var.my_ip]
   }
 
+  ingress {
+    description     = "SSH from Jenkins (Ansible jump host)"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    security_groups = [aws_security_group.jenkins.id]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -100,6 +108,14 @@ resource "aws_security_group" "infra" {
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description     = "SSH from Jenkins (Ansible jump host)"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    security_groups = [aws_security_group.jenkins.id]
   }
 
   tags = { Name = "ms-learning-infra-sg" }

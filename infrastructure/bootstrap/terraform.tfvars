@@ -3,4 +3,4 @@ project_name = "microservices-learning"
 environment  = "dev"
 
 # Uncomment to target LocalStack instead of AWS:
-localstack_endpoint = "http://localhost:4566"
+#localstack_endpoint = "http://localhost:4566"

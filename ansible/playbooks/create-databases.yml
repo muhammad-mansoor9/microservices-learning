@@ -1,0 +1,47 @@
+---
+# Runs on the config-server because it has app-sg which allows port 5432 to RDS.
+# Required extra vars: rds_host, db_password
+
+- name: Create application databases on RDS
+  hosts: config_server
+  become: true
+
+  tasks:
+    - name: Install PostgreSQL 15 client
+      ansible.builtin.dnf:
+        name: postgresql15
+        state: present
+
+    - name: Create order_db
+      ansible.builtin.command:
+        cmd: psql -h {{ rds_host }} -U postgres -d postgres -c "CREATE DATABASE order_db"
+      environment:
+        PGPASSWORD: "{{ db_password }}"
+      register: create_order
+      failed_when:
+        - create_order.rc != 0
+        - '"already exists" not in create_order.stderr'
+      changed_when: '"already exists" not in create_order.stderr'
+
+    - name: Create payment_db
+      ansible.builtin.command:
+        cmd: psql -h {{ rds_host }} -U postgres -d postgres -c "CREATE DATABASE payment_db"
+      environment:
+        PGPASSWORD: "{{ db_password }}"
+      register: create_payment
+      failed_when:
+        - create_payment.rc != 0
+        - '"already exists" not in create_payment.stderr'
+      changed_when: '"already exists" not in create_payment.stderr'
+
+    - name: Confirm databases exist
+      ansible.builtin.command:
+        cmd: psql -h {{ rds_host }} -U postgres -d postgres -c "\l"
+      environment:
+        PGPASSWORD: "{{ db_password }}"
+      register: db_list
+      changed_when: false
+
+    - name: Print database list
+      ansible.builtin.debug:
+        msg: "{{ db_list.stdout_lines }}"

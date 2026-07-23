@@ -62,6 +62,14 @@ resource "aws_security_group" "app" {
     security_groups = [aws_security_group.jenkins.id]
   }
 
+  ingress {
+    description = "Intra-app-sg: app servers to Eureka, Config Server, and each other"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    self        = true
+  }
+
   egress {
     from_port   = 0
     to_port     = 0

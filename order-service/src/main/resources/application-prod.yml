@@ -19,6 +19,38 @@ spring:
     hibernate:
       ddl-auto: update
 
+  cloud:
+    function:
+      definition: paymentApproved;paymentFailed
+    stream:
+      bindings:
+        order-events-out-0:
+          destination: order.events
+        paymentApproved-in-0:
+          destination: payment.events
+          group: order-service-approved
+        paymentFailed-in-0:
+          destination: payment.events
+          group: order-service-failed
+      rabbit:
+        bindings:
+          order-events-out-0:
+            producer:
+              exchange-type: topic
+              routing-key-expression: headers['routingKey']
+          paymentApproved-in-0:
+            consumer:
+              exchange-type: topic
+              binding-routing-key: payment.approved
+              auto-bind-dlq: true
+              dead-letter-queue-name: payment.events.dlq
+          paymentFailed-in-0:
+            consumer:
+              exchange-type: topic
+              binding-routing-key: payment.failed
+              auto-bind-dlq: true
+              dead-letter-queue-name: payment.events.dlq
+
 services:
   user-service-url: ${USER_SERVICE_URL}
   payment-service-url: ${PAYMENT_SERVICE_URL}

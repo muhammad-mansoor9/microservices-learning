@@ -13,6 +13,29 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+  cloud:
+    function:
+      definition: orderCreated
+    stream:
+      bindings:
+        orderCreated-in-0:
+          destination: order.events
+          group: payment-service
+        payment-events-out-0:
+          destination: payment.events
+      rabbit:
+        bindings:
+          orderCreated-in-0:
+            consumer:
+              exchange-type: topic
+              binding-routing-key: order.created
+              auto-bind-dlq: true
+              dead-letter-queue-name: order.events.dlq
+          payment-events-out-0:
+            producer:
+              exchange-type: topic
+              routing-key-expression: headers['routingKey']
+
 management:
   endpoints:
     web:

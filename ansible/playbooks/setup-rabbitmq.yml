@@ -4,15 +4,37 @@
   become: true
 
   tasks:
-    - name: Add RabbitMQ Erlang CloudSmith repo
-      ansible.builtin.shell:
-        cmd: curl -1sLf 'https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/setup.rpm.sh' | bash
-        creates: /etc/yum.repos.d/rabbitmq_rabbitmq-erlang.repo
+    - name: Write Erlang repo for RHEL9 / Amazon Linux 2023
+      ansible.builtin.copy:
+        dest: /etc/yum.repos.d/rabbitmq-erlang.repo
+        mode: "0644"
+        content: |
+          [rabbitmq-el9-erlang]
+          name=Erlang for RabbitMQ (el9 / Amazon Linux 2023)
+          baseurl=https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/rpm/el/9/$basearch
+          gpgcheck=1
+          gpgkey=https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/gpg.E495BB49CC4BBE5B.key
+          repo_gpgcheck=0
+          enabled=1
+          sslverify=1
+          sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+          metadata_expire=300
 
-    - name: Add RabbitMQ server CloudSmith repo
-      ansible.builtin.shell:
-        cmd: curl -1sLf 'https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/setup.rpm.sh' | bash
-        creates: /etc/yum.repos.d/rabbitmq_rabbitmq-server.repo
+    - name: Write RabbitMQ server repo for RHEL9 / Amazon Linux 2023
+      ansible.builtin.copy:
+        dest: /etc/yum.repos.d/rabbitmq-server.repo
+        mode: "0644"
+        content: |
+          [rabbitmq-server]
+          name=RabbitMQ Server (el9 / Amazon Linux 2023)
+          baseurl=https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/rpm/el/9/$basearch
+          gpgcheck=1
+          gpgkey=https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/gpg.9F4587D7.key
+          repo_gpgcheck=0
+          enabled=1
+          sslverify=1
+          sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+          metadata_expire=300
 
     - name: Install Erlang and RabbitMQ
       ansible.builtin.dnf:
@@ -26,8 +48,6 @@
         dest: /etc/rabbitmq/rabbitmq.conf
         mode: "0644"
         content: |
-          # Allow the default guest user to connect from any IP.
-          # Acceptable for a learning environment — restrict in production.
           loopback_users.guest = false
           management.listener.port = 15672
 

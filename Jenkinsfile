@@ -110,6 +110,8 @@ pipeline {
         stage('Smoke Test') {
             steps {
                 sh """
+                    echo "Waiting 60s for Eureka registration to propagate..."
+                    sleep 60
                     echo "Smoke test → http://${params.ALB_DNS}/api/orders/actuator/health"
                     HTTP_STATUS=\$(curl -s -o /dev/null -w "%{http_code}" \
                         http://${params.ALB_DNS}/api/orders/actuator/health)

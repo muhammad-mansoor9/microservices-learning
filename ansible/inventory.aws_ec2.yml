@@ -17,13 +17,16 @@ compose:
   ansible_user: "'ec2-user'"
 
 groups:
-  config_server:   "tags.Name == 'ms-learning-config-server'"
-  eureka_server:   "tags.Name == 'ms-learning-eureka-server'"
-  rabbitmq:        "tags.Name == 'ms-learning-rabbitmq'"
-  keycloak:        "tags.Name == 'ms-learning-keycloak'"
-  jenkins:         "tags.Name == 'ms-learning-jenkins'"
-  monitoring:      "tags.Name == 'ms-learning-monitoring'"
-  app_servers:     "tags.Name == 'ms-learning-app-asg'"
+  config_server:    "tags.Name == 'ms-learning-config-server'"
+  eureka_server:    "tags.Name == 'ms-learning-eureka-server'"
+  rabbitmq:         "tags.Name == 'ms-learning-rabbitmq'"
+  keycloak:         "tags.Name == 'ms-learning-keycloak'"
+  jenkins:          "tags.Name == 'ms-learning-jenkins'"
+  monitoring:       "tags.Name == 'ms-learning-monitoring'"
+  user_servers:     "tags.Name == 'ms-learning-user-service'"
+  payment_servers:  "tags.Name == 'ms-learning-payment-service'"
+  order_servers:    "tags.Name == 'ms-learning-order-service'"
+  gateway_servers:  "tags.Name == 'ms-learning-api-gateway'"
 
   # These four have no public IP — Ansible reaches them via Jenkins ProxyCommand.
   # group_vars/private_hosts.yml sets ansible_ssh_common_args for this group.
@@ -40,5 +43,8 @@ groups:
     tags.Name in [
       'ms-learning-jenkins',
       'ms-learning-monitoring',
-      'ms-learning-app-asg'
+      'ms-learning-user-service',
+      'ms-learning-payment-service',
+      'ms-learning-order-service',
+      'ms-learning-api-gateway'
     ]

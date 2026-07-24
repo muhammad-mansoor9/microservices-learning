@@ -15,6 +15,8 @@ import com.example.order.readmodel.OrderRepository;
 import com.example.order.readmodel.OrderStatus;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,7 +29,6 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class OrderCommandHandler {
 
     private static final Logger log = LoggerFactory.getLogger(OrderCommandHandler.class);
@@ -39,35 +40,68 @@ public class OrderCommandHandler {
     private final OrderEventPublisher orderEventPublisher;
     private final TransactionTemplate transactionTemplate;
     private final UserContext userContext;
+    private final Counter ordersCreatedSuccess;
+    private final Counter ordersCreatedFailure;
+
+    public OrderCommandHandler(OrderEventRepository orderEventRepository,
+                               OrderRepository orderRepository,
+                               ObjectMapper objectMapper,
+                               UserServiceClient userServiceClient,
+                               OrderEventPublisher orderEventPublisher,
+                               TransactionTemplate transactionTemplate,
+                               UserContext userContext,
+                               MeterRegistry meterRegistry) {
+        this.orderEventRepository = orderEventRepository;
+        this.orderRepository = orderRepository;
+        this.objectMapper = objectMapper;
+        this.userServiceClient = userServiceClient;
+        this.orderEventPublisher = orderEventPublisher;
+        this.transactionTemplate = transactionTemplate;
+        this.userContext = userContext;
+        this.ordersCreatedSuccess = Counter.builder("orders_created_total")
+                .tag("status", "success")
+                .description("Total orders created successfully")
+                .register(meterRegistry);
+        this.ordersCreatedFailure = Counter.builder("orders_created_total")
+                .tag("status", "failure")
+                .description("Total orders that failed to create")
+                .register(meterRegistry);
+    }
 
     public UUID handle(CreateOrderCommand command) {
         String actor = userContext.getUsername() != null ? userContext.getUsername() : "internal";
         log.info("Creating order username={} traceId={}", actor, MDC.get("traceId"));
 
-        // Phase 1: validate user — synchronous, no DB connection held
-        userServiceClient.findById(command.userId())
-                .orElseThrow(() -> new UserNotFoundException(command.userId()));
+        try {
+            // Phase 1: validate user — synchronous, no DB connection held
+            userServiceClient.findById(command.userId())
+                    .orElseThrow(() -> new UserNotFoundException(command.userId()));
 
-        UUID orderId = UUID.randomUUID();
-        Instant now = Instant.now();
-        OrderCreatedEvent event = new OrderCreatedEvent(orderId, command.userId(), command.amount(), now);
+            UUID orderId = UUID.randomUUID();
+            Instant now = Instant.now();
+            OrderCreatedEvent event = new OrderCreatedEvent(orderId, command.userId(), command.amount(), now);
 
-        // Phase 2: write event + PENDING read model, then commit — DB connection released
-        transactionTemplate.executeWithoutResult(tx -> {
-            appendEvent(orderId, "OrderCreated", event);
-            Order order = new Order();
-            order.setId(orderId);
-            order.setUserId(command.userId());
-            order.setAmount(command.amount());
-            order.setStatus(OrderStatus.PENDING);
-            order.setCreatedAt(now);
-            orderRepository.save(order);
-        });
+            // Phase 2: write event + PENDING read model, then commit — DB connection released
+            transactionTemplate.executeWithoutResult(tx -> {
+                appendEvent(orderId, "OrderCreated", event);
+                Order order = new Order();
+                order.setId(orderId);
+                order.setUserId(command.userId());
+                order.setAmount(command.amount());
+                order.setStatus(OrderStatus.PENDING);
+                order.setCreatedAt(now);
+                orderRepository.save(order);
+            });
 
-        // Phase 3: publish to RabbitMQ — SAGA choreography continues asynchronously
-        orderEventPublisher.publishOrderCreated(event);
+            // Phase 3: publish to RabbitMQ — SAGA choreography continues asynchronously
+            orderEventPublisher.publishOrderCreated(event);
 
-        return orderId;
+            ordersCreatedSuccess.increment();
+            return orderId;
+        } catch (Exception e) {
+            ordersCreatedFailure.increment();
+            throw e;
+        }
     }
 
     @Transactional

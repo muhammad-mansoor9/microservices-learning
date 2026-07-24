@@ -152,12 +152,20 @@
               editable: false
       notify: Restart grafana
 
+    - name: Remove SysV init script (AL2023 lacks systemd-sysv-install)
+      ansible.builtin.file:
+        path: /etc/init.d/grafana-server
+        state: absent
+
+    - name: Reload systemd after Grafana install
+      ansible.builtin.systemd:
+        daemon_reload: true
+
     - name: Enable and start Grafana
       ansible.builtin.systemd:
         name: grafana-server
         enabled: true
         state: started
-        daemon_reload: true
 
   handlers:
     - name: Restart prometheus

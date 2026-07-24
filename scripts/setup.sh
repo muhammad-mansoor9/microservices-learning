@@ -62,6 +62,12 @@ AWS_PROFILE=work ansible-playbook \
   -e "db_password=$DB_PASSWORD" \
   -e "keycloak_admin_password=$KC_ADMIN_PASSWORD"
 
+echo "Running install-monitoring playbook..."
+AWS_PROFILE=work ansible-playbook \
+  -i "$ANSIBLE_DIR/inventory.aws_ec2.yml" \
+  "$ANSIBLE_DIR/playbooks/install-monitoring.yml" \
+  --private-key ~/ms-learning-key.pem
+
 # ---------- 5. Update Jenkinsfile default parameter values -------------------
 echo "Updating Jenkinsfile parameter defaults..."
 JENKINSFILE="$REPO_ROOT/Jenkinsfile"

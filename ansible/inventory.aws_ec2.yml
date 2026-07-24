@@ -28,14 +28,15 @@ groups:
   order_servers:    "tags.Name == 'ms-learning-order-service'"
   gateway_servers:  "tags.Name == 'ms-learning-api-gateway'"
 
-  # These four have no public IP — Ansible reaches them via Jenkins ProxyCommand.
+  # SSH only reachable via Jenkins ProxyCommand (either no public IP, or SG restricts SSH to Jenkins SG).
   # group_vars/private_hosts.yml sets ansible_ssh_common_args for this group.
   private_hosts: >-
     tags.Name in [
       'ms-learning-config-server',
       'ms-learning-eureka-server',
       'ms-learning-rabbitmq',
-      'ms-learning-keycloak'
+      'ms-learning-keycloak',
+      'ms-learning-monitoring'
     ]
 
   # Reached via Jenkins as bastion — ansible_host is overridden to private IP

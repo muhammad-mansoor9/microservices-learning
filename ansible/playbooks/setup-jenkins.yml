@@ -84,3 +84,34 @@
     - name: Show Jenkins initial admin password
       ansible.builtin.debug:
         msg: "Jenkins initial admin password: {{ jenkins_password.stdout }}"
+
+    - name: Wait for Jenkins web UI to be ready
+      ansible.builtin.uri:
+        url: http://localhost:8080/login
+        status_code: 200
+      retries: 18
+      delay: 10
+      register: _jenkins_ui
+      until: _jenkins_ui.status == 200
+
+    - name: Download Jenkins CLI jar
+      ansible.builtin.get_url:
+        url: http://localhost:8080/jnlpJars/jenkins-cli.jar
+        dest: /opt/jenkins-cli.jar
+        mode: "0644"
+
+    - name: Install required Jenkins plugins
+      ansible.builtin.shell: >
+        java -jar /opt/jenkins-cli.jar
+        -s http://localhost:8080
+        -auth "admin:{{ jenkins_password.stdout }}"
+        install-plugin
+        workflow-aggregator git github pipeline-aws ssh-agent credentials-binding
+        -restart
+      changed_when: true
+
+    - name: Wait for Jenkins to come back up after plugin install
+      ansible.builtin.wait_for:
+        port: 8080
+        timeout: 120
+        delay: 20

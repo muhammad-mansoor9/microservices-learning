@@ -27,7 +27,7 @@ resource "aws_instance" "user_service" {
   iam_instance_profile        = aws_iam_instance_profile.ec2.name
 
   root_block_device {
-    volume_size           = 20
+    volume_size           = 30
     volume_type           = "gp3"
     delete_on_termination = true
   }
@@ -49,7 +49,7 @@ resource "aws_instance" "payment_service" {
   iam_instance_profile        = aws_iam_instance_profile.ec2.name
 
   root_block_device {
-    volume_size           = 20
+    volume_size           = 30
     volume_type           = "gp3"
     delete_on_termination = true
   }
@@ -71,7 +71,7 @@ resource "aws_instance" "order_service" {
   iam_instance_profile        = aws_iam_instance_profile.ec2.name
 
   root_block_device {
-    volume_size           = 20
+    volume_size           = 30
     volume_type           = "gp3"
     delete_on_termination = true
   }
@@ -93,7 +93,7 @@ resource "aws_instance" "api_gateway" {
   iam_instance_profile        = aws_iam_instance_profile.ec2.name
 
   root_block_device {
-    volume_size           = 20
+    volume_size           = 30
     volume_type           = "gp3"
     delete_on_termination = true
   }
@@ -116,7 +116,7 @@ resource "aws_instance" "eureka_server" {
   iam_instance_profile   = aws_iam_instance_profile.ec2.name
 
   root_block_device {
-    volume_size           = 20
+    volume_size           = 30
     volume_type           = "gp3"
     delete_on_termination = true
   }
@@ -133,7 +133,7 @@ resource "aws_instance" "config_server" {
   iam_instance_profile   = aws_iam_instance_profile.ec2.name
 
   root_block_device {
-    volume_size           = 20
+    volume_size           = 30
     volume_type           = "gp3"
     delete_on_termination = true
   }
@@ -150,7 +150,7 @@ resource "aws_instance" "rabbitmq" {
   iam_instance_profile   = aws_iam_instance_profile.ec2.name
 
   root_block_device {
-    volume_size           = 20
+    volume_size           = 30
     volume_type           = "gp3"
     delete_on_termination = true
   }
@@ -167,7 +167,7 @@ resource "aws_instance" "keycloak" {
   iam_instance_profile   = aws_iam_instance_profile.ec2.name
 
   root_block_device {
-    volume_size           = 20
+    volume_size           = 30
     volume_type           = "gp3"
     delete_on_termination = true
   }
@@ -187,7 +187,7 @@ resource "aws_instance" "jenkins" {
   iam_instance_profile        = aws_iam_instance_profile.ec2.name
 
   root_block_device {
-    volume_size           = 20
+    volume_size           = 30
     volume_type           = "gp3"
     delete_on_termination = true
   }
@@ -205,7 +205,7 @@ resource "aws_instance" "monitoring" {
   iam_instance_profile        = aws_iam_instance_profile.ec2.name
 
   root_block_device {
-    volume_size           = 20
+    volume_size           = 30
     volume_type           = "gp3"
     delete_on_termination = true
   }

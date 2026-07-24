@@ -73,24 +73,11 @@ ssh -i ~/ms-learning-key.pem ec2-user@<jenkins_public_ip>
 sudo cat /var/lib/jenkins/secrets/initialAdminPassword
 ```
 
-Open `http://<jenkins_public_ip>:8080`, paste the password, click **Install suggested plugins**.
+Open `http://<jenkins_public_ip>:8080`, paste the password, and create your admin user when prompted.
 
-Create your admin user when prompted.
+The Ansible playbook already installed all required plugins (Pipeline, Git, GitHub, Pipeline: AWS Steps, SSH Agent, Credentials Binding) and restarted Jenkins — no manual plugin installation needed.
 
-### 3.2 Install Required Plugins
-
-Go to **Manage Jenkins → Plugins → Available** and install:
-
-- Pipeline
-- Git
-- GitHub
-- Amazon Web Services SDK (or Pipeline: AWS Steps)
-- SSH Agent
-- Credentials Binding
-
-Restart Jenkins after installing.
-
-### 3.3 Add Credentials
+### 3.2 Add Credentials
 
 Go to **Manage Jenkins → Credentials → System → Global → Add Credential**:
 

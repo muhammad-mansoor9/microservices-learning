@@ -38,10 +38,10 @@ groups:
       'ms-learning-keycloak'
     ]
 
-  # Directly reachable via their public IPs.
+  # Reached via Jenkins as bastion — ansible_host is overridden to private IP
+  # in group_vars/public_hosts.yml even though they have public IPs.
   public_hosts: >-
     tags.Name in [
-      'ms-learning-jenkins',
       'ms-learning-monitoring',
       'ms-learning-user-service',
       'ms-learning-payment-service',

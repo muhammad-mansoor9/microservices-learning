@@ -67,16 +67,16 @@ echo "Updating Jenkinsfile parameter defaults..."
 JENKINSFILE="$REPO_ROOT/Jenkinsfile"
 KEYCLOAK_ISSUER_URI="http://$KEYCLOAK_HOST:9090/realms/ms-learning"
 
-sed -i.bak \
-  -e "s|defaultValue: '[^']*', description: 'ALB DNS name'|defaultValue: '$ALB_DNS', description: 'ALB DNS name'|" \
-  -e "s|defaultValue: '[^']*', description: 'Eureka private IP'|defaultValue: '$EUREKA_HOST', description: 'Eureka private IP'|" \
-  -e "s|defaultValue: '[^']*', description: 'Config-server private IP'|defaultValue: '$CONFIG_HOST', description: 'Config-server private IP'|" \
-  -e "s|defaultValue: '[^']*', description: 'RabbitMQ private IP'|defaultValue: '$RABBITMQ_HOST', description: 'RabbitMQ private IP'|" \
-  -e "s|defaultValue: '[^']*', description: 'Keycloak private IP'|defaultValue: '$KEYCLOAK_HOST', description: 'Keycloak private IP'|" \
-  -e "s|defaultValue: '[^']*', description: 'PostgreSQL RDS host'|defaultValue: '$RDS_HOST', description: 'PostgreSQL RDS host'|" \
-  -e "s|defaultValue: '[^']*', description: 'Keycloak issuer URI'|defaultValue: '$KEYCLOAK_ISSUER_URI', description: 'Keycloak issuer URI'|" \
-  -e "s|defaultValue: '[^']*', description: 'Private IP of user-service EC2.*'|defaultValue: '$USER_SERVICE_HOST', description: 'Private IP of user-service EC2 (from terraform output user_service_private_ip)'|" \
-  -e "s|defaultValue: '[^']*', description: 'Private IP of payment-service EC2.*'|defaultValue: '$PAYMENT_SERVICE_HOST', description: 'Private IP of payment-service EC2 (from terraform output payment_service_private_ip)'|" \
+sed -i.bak -E \
+  -e "s|defaultValue: '[^']*'[[:space:]]*,[[:space:]]*description: 'ALB DNS name'|defaultValue: '$ALB_DNS', description: 'ALB DNS name'|" \
+  -e "s|defaultValue: '[^']*'[[:space:]]*,[[:space:]]*description: 'Eureka private IP'|defaultValue: '$EUREKA_HOST', description: 'Eureka private IP'|" \
+  -e "s|defaultValue: '[^']*'[[:space:]]*,[[:space:]]*description: 'Config-server private IP'|defaultValue: '$CONFIG_HOST', description: 'Config-server private IP'|" \
+  -e "s|defaultValue: '[^']*'[[:space:]]*,[[:space:]]*description: 'RabbitMQ private IP'|defaultValue: '$RABBITMQ_HOST', description: 'RabbitMQ private IP'|" \
+  -e "s|defaultValue: '[^']*'[[:space:]]*,[[:space:]]*description: 'Keycloak private IP'|defaultValue: '$KEYCLOAK_HOST', description: 'Keycloak private IP'|" \
+  -e "s|defaultValue: '[^']*'[[:space:]]*,[[:space:]]*description: 'PostgreSQL RDS host'|defaultValue: '$RDS_HOST', description: 'PostgreSQL RDS host'|" \
+  -e "s|defaultValue: '[^']*'[[:space:]]*,[[:space:]]*description: 'Keycloak issuer URI'|defaultValue: '$KEYCLOAK_ISSUER_URI', description: 'Keycloak issuer URI'|" \
+  -e "s|defaultValue: '[^']*'[[:space:]]*,[[:space:]]*description: 'Private IP of user-service EC2[^']*'|defaultValue: '$USER_SERVICE_HOST', description: 'Private IP of user-service EC2 (from terraform output user_service_private_ip)'|" \
+  -e "s|defaultValue: '[^']*'[[:space:]]*,[[:space:]]*description: 'Private IP of payment-service EC2[^']*'|defaultValue: '$PAYMENT_SERVICE_HOST', description: 'Private IP of payment-service EC2 (from terraform output payment_service_private_ip)'|" \
   "$JENKINSFILE"
 rm -f "$JENKINSFILE.bak"
 

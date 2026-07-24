@@ -5,6 +5,9 @@ networks:
 volumes:
   localstack-data:
   postgres-data:
+  rabbitmq-data:
+  prometheus-data:
+  grafana-data:
 
 services:
 
@@ -69,6 +72,113 @@ services:
       - ms-network
     restart: "no"
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    container_name: keycloak
+    command: start-dev --import-realm
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KC_HOSTNAME_URL=http://keycloak:8080
+      - KC_HOSTNAME_STRICT=false
+      - KC_HOSTNAME_STRICT_BACKCHANNEL=false
+    ports:
+      - "9090:8080"
+    volumes:
+      - ./infrastructure/keycloak/ms-learning-realm.json:/opt/keycloak/data/import/ms-learning-realm.json:ro
+    networks:
+      - ms-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/realms/ms-learning || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - ms-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ── Spring Cloud Infrastructure ─────────────────────────────────────────────
+
+  eureka-server:
+    build:
+      context: .
+      dockerfile: eureka-server/Dockerfile
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    networks:
+      - ms-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  config-server:
+    build:
+      context: .
+      dockerfile: config-server/Dockerfile
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    environment:
+      - SPRING_PROFILES_ACTIVE=native,docker
+      - INTERNAL_API_KEY=docker-dev-key
+    volumes:
+      - ./config-server/config-repo:/config-repo:ro
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - ms-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - INTERNAL_API_KEY=docker-dev-key
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - ms-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
   # ── Microservices ───────────────────────────────────────────────────────────
 
   user-service:
@@ -80,8 +190,15 @@ services:
       - "8083:8083"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
+      - INTERNAL_API_KEY=docker-dev-key
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - KEYCLOAK_ISSUER_URI=http://keycloak:8080/realms/ms-learning
     depends_on:
       localstack:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      keycloak:
         condition: service_healthy
     networks:
       - ms-network
@@ -102,8 +219,14 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - POSTGRES_PASSWORD=postgres
+      - INTERNAL_API_KEY=docker-dev-key
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
     depends_on:
       postgres:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - ms-network
@@ -124,12 +247,19 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=docker
       - POSTGRES_PASSWORD=postgres
+      - INTERNAL_API_KEY=docker-dev-key
+      - SPRING_CLOUD_CONFIG_URI=http://config-server:8888
+      - KEYCLOAK_ISSUER_URI=http://keycloak:8080/realms/ms-learning
     depends_on:
       postgres:
         condition: service_healthy
-      payment-service:
-        condition: service_healthy
       user-service:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     networks:
       - ms-network
@@ -139,3 +269,38 @@ services:
       timeout: 5s
       retries: 10
       start_period: 60s
+
+  # ── Monitoring ──────────────────────────────────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - ms-network
+    depends_on:
+      - order-service
+      - payment-service
+      - user-service
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - ms-network
+    depends_on:
+      - prometheus

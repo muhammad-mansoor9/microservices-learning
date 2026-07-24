@@ -1,0 +1,8 @@
+internal:
+  api:
+    key: ${INTERNAL_API_KEY:docker-dev-key}
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://eureka-server:8761/eureka/

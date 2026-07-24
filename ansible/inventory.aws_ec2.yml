@@ -1,0 +1,51 @@
+plugin: amazon.aws.aws_ec2
+
+regions:
+  - us-east-1
+
+filters:
+  tag:Project: ms-learning
+  instance-state-name: running
+
+# Use public IP when the instance has one (public subnet), fall back to
+# private IP (private subnet instances — reached via ProxyJump from Jenkins).
+hostnames:
+  - ip-address
+  - private-ip-address
+
+compose:
+  ansible_user: "'ec2-user'"
+
+groups:
+  config_server:    "tags.Name == 'ms-learning-config-server'"
+  eureka_server:    "tags.Name == 'ms-learning-eureka-server'"
+  rabbitmq:         "tags.Name == 'ms-learning-rabbitmq'"
+  keycloak:         "tags.Name == 'ms-learning-keycloak'"
+  jenkins:          "tags.Name == 'ms-learning-jenkins'"
+  monitoring:       "tags.Name == 'ms-learning-monitoring'"
+  user_servers:     "tags.Name == 'ms-learning-user-service'"
+  payment_servers:  "tags.Name == 'ms-learning-payment-service'"
+  order_servers:    "tags.Name == 'ms-learning-order-service'"
+  gateway_servers:  "tags.Name == 'ms-learning-api-gateway'"
+
+  # SSH only reachable via Jenkins ProxyCommand (either no public IP, or SG restricts SSH to Jenkins SG).
+  # group_vars/private_hosts.yml sets ansible_ssh_common_args for this group.
+  private_hosts: >-
+    tags.Name in [
+      'ms-learning-config-server',
+      'ms-learning-eureka-server',
+      'ms-learning-rabbitmq',
+      'ms-learning-keycloak',
+      'ms-learning-monitoring'
+    ]
+
+  # Reached via Jenkins as bastion — ansible_host is overridden to private IP
+  # in group_vars/public_hosts.yml even though they have public IPs.
+  public_hosts: >-
+    tags.Name in [
+      'ms-learning-monitoring',
+      'ms-learning-user-service',
+      'ms-learning-payment-service',
+      'ms-learning-order-service',
+      'ms-learning-api-gateway'
+    ]

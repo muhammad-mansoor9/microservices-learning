@@ -1,0 +1,20 @@
+---
+- name: Install Amazon Corretto 21 on all hosts
+  hosts: all:!monitoring:!user_servers:!payment_servers:!order_servers:!gateway_servers
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Install Amazon Corretto 21
+      ansible.builtin.yum:
+        name: java-21-amazon-corretto-headless
+        state: present
+
+    - name: Verify Java version
+      ansible.builtin.command: java -version
+      register: java_ver
+      changed_when: false
+
+    - name: Print Java version
+      ansible.builtin.debug:
+        msg: "{{ java_ver.stderr }}"

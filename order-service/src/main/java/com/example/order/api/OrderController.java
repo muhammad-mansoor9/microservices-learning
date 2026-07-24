@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.net.URI;
 import java.util.Map;
 import java.util.UUID;
 
@@ -27,7 +26,7 @@ public class OrderController {
     public ResponseEntity<UUID> createOrder(@Valid @RequestBody CreateOrderCommand command) {
         UUID orderId = commandHandler.handle(command);
         return ResponseEntity
-                .created(URI.create("/api/orders/" + orderId))
+                .accepted()
                 .body(orderId);
     }
 

@@ -9,6 +9,27 @@ aws:
   dynamodb:
     table-name: users
 
+internal:
+  api:
+    key: ${INTERNAL_API_KEY:docker-dev-key}
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI}
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://eureka-server:8761/eureka/
+
+spring:
+  cloud:
+    config:
+      uri: http://config-server:8888
+
 management:
   endpoints:
     web:

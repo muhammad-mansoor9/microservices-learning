@@ -7,6 +7,9 @@ RUN mvn install -N -q
 COPY order-service/pom.xml order-service/pom.xml
 COPY payment-service/pom.xml payment-service/pom.xml
 COPY user-service/pom.xml user-service/pom.xml
+COPY eureka-server/pom.xml eureka-server/pom.xml
+COPY api-gateway/pom.xml api-gateway/pom.xml
+COPY config-server/pom.xml config-server/pom.xml
 RUN mvn -pl payment-service dependency:go-offline -q
 
 COPY payment-service/src payment-service/src

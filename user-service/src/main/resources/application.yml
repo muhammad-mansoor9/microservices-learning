@@ -3,3 +3,9 @@ spring:
     name: user-service
   profiles:
     active: local
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus

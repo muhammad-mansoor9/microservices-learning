@@ -1,5 +1,11 @@
 server:
-  port: ${PORT:8083}
+  port: ${PORT:8081}
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI}
 aws:
   region: ${AWS_REGION:us-east-1}
   endpoint-override: ""
@@ -7,11 +13,16 @@ aws:
   secret-key: ${AWS_SECRET_ACCESS_KEY:}
   dynamodb:
     table-name: ${USERS_TABLE:users}
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka}
+
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,info,prometheus
   endpoint:
     health:
       show-details: never

@@ -1,0 +1,16 @@
+---
+# Master playbook — run this after every terraform apply.
+# It installs Java, sets up RabbitMQ and Keycloak, and creates the databases.
+#
+# Required extra vars:
+#   rds_host                — from: terraform output -raw rds_host
+#   db_password             — the password you used in terraform apply
+#   keycloak_admin_password — choose a password for the Keycloak admin console
+
+- import_playbook: install-java.yml
+
+- import_playbook: setup-rabbitmq.yml
+
+- import_playbook: setup-keycloak.yml
+
+- import_playbook: create-databases.yml

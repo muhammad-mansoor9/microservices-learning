@@ -7,6 +7,20 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:9090/realms/ms-learning
+
+internal:
+  api:
+    key: local-dev-key
 
 services:
   user-service-url: http://localhost:8083

@@ -13,6 +13,44 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+  rabbitmq:
+    host: rabbitmq
+    port: 5672
+    username: guest
+    password: guest
+  cloud:
+    config:
+      uri: http://config-server:8888
+    function:
+      definition: orderCreated
+    stream:
+      bindings:
+        orderCreated-in-0:
+          destination: order.events
+          group: payment-service
+        payment-events-out-0:
+          destination: payment.events
+      rabbit:
+        bindings:
+          orderCreated-in-0:
+            consumer:
+              exchange-type: topic
+              binding-routing-key: order.created
+              auto-bind-dlq: true
+              dead-letter-queue-name: order.events.dlq
+          payment-events-out-0:
+            producer:
+              exchange-type: topic
+              routing-key-expression: headers['routingKey']
+
+internal:
+  api:
+    key: ${INTERNAL_API_KEY:docker-dev-key}
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://eureka-server:8761/eureka/
 
 management:
   endpoints:

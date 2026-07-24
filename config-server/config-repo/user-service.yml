@@ -1,0 +1,13 @@
+# Centralised configuration for user-service
+# Values here are merged with the service's own application.yml at startup.
+
+# Shared internal API key — must match the value set in order-service.yml.
+internal:
+  api:
+    key: ${INTERNAL_API_KEY:local-dev-key}
+
+# Example overrides (uncomment and adjust as needed):
+# aws:
+#   region: us-east-1
+#   dynamodb:
+#     table-name: users

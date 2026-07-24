@@ -1,0 +1,9 @@
+# ProxyCommand tunnels through Jenkins so Ansible can reach private-subnet instances.
+# Jenkins authenticates using agent-forwarded key (ssh-add is called in setup.sh).
+# JENKINS_IP is exported by scripts/setup.sh before ansible-playbook runs.
+ansible_ssh_common_args: >-
+  -o StrictHostKeyChecking=no
+  -o UserKnownHostsFile=/dev/null
+  -o "ProxyCommand=ssh -i ~/ms-learning-key.pem -W %h:%p
+  -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
+  ec2-user@{{ lookup('env', 'JENKINS_IP') }}"

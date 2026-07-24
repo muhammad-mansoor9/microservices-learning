@@ -9,13 +9,13 @@ pipeline {
     }
 
     parameters {
-        string(name: 'ALB_DNS',              defaultValue: 'ms-learning-alb-287042979.us-east-1.elb.amazonaws.com', description: 'ALB DNS name')
+        string(name: 'ALB_DNS',              defaultValue: 'ms-learning-alb-1187268168.us-east-1.elb.amazonaws.com', description: 'ALB DNS name')
         string(name: 'EUREKA_HOST',          defaultValue: '10.0.3.25',    description: 'Eureka private IP')
         string(name: 'CONFIG_HOST',          defaultValue: '10.0.3.136',   description: 'Config-server private IP')
         string(name: 'RABBITMQ_HOST',        defaultValue: '10.0.4.158',   description: 'RabbitMQ private IP')
         string(name: 'KEYCLOAK_HOST',        defaultValue: '10.0.4.199',   description: 'Keycloak private IP')
         string(name: 'DB_HOST',              defaultValue: 'ms-learning-postgres.c8xm6w2gsz3i.us-east-1.rds.amazonaws.com', description: 'PostgreSQL RDS host')
-        string(name: 'KEYCLOAK_ISSUER_URI',  defaultValue: 'http://10.0.4.199:9090/realms/ms-learning', description: 'Keycloak issuer URI')
+        string(name: 'KEYCLOAK_ISSUER_URI',  defaultValue: 'http://10.0.4.76:9090/realms/ms-learning', description: 'Keycloak issuer URI')
         string(name: 'CONFIG_REPO_URI',      defaultValue: 'https://github.com/muhammad-mansoor9/ms-learning-config-repo', description: 'Spring Cloud Config git repo')
         string(name: 'USER_SERVICE_HOST',    defaultValue: '',             description: 'Private IP of user-service EC2 (from terraform output user_service_private_ip)')
         string(name: 'PAYMENT_SERVICE_HOST', defaultValue: '',             description: 'Private IP of payment-service EC2 (from terraform output payment_service_private_ip)')

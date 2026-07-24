@@ -90,8 +90,8 @@ pipeline {
                 ]) {
                     sh """
                         ansible-playbook \
-                            -i ${ANSIBLE_DIR}/inventory.aws_ec2.yml \
-                            ${ANSIBLE_DIR}/playbooks/deploy-all.yml \
+                            -i "${ANSIBLE_DIR}/inventory.aws_ec2.yml" \
+                            "${ANSIBLE_DIR}/playbooks/deploy-all.yml" \
                             --private-key "\$SSH_KEY_FILE" \
                             -e build_number=${BUILD_NUMBER} \
                             -e s3_bucket=${S3_BUCKET} \

@@ -1,11 +1,11 @@
 ---
 # Standalone usage:
 #   ansible-playbook deploy-service.yml \
-#     -e "target_hosts=app_servers" \
+#     -e "target_hosts=order_servers" \
 #     -e "service_name=order-service" \
 #     -e "service_port=8083" \
 #     -e "jar_s3_path=s3://ms-learning-artifacts/42/order-service.jar" \
-#     -e '{"env_vars": {"SERVER_PORT": "8083", "SPRING_PROFILES_ACTIVE": "ec2"}}'
+#     -e '{"env_vars": {"SERVER_PORT": "8083", "SPRING_PROFILES_ACTIVE": "prod"}}'
 
 - name: Deploy {{ service_name }}
   hosts: "{{ target_hosts }}"

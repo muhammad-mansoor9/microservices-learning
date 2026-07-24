@@ -174,11 +174,11 @@ resource "aws_security_group" "jenkins" {
 
 resource "aws_security_group" "monitoring" {
   name        = "ms-learning-monitoring-sg"
-  description = "Allow Prometheus and Grafana from operator IP"
+  description = "Allow Prometheus and Grafana from operator IP, SSH from Jenkins"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description = "Prometheus"
+    description = "Prometheus UI"
     from_port   = 9090
     to_port     = 9090
     protocol    = "tcp"
@@ -186,11 +186,19 @@ resource "aws_security_group" "monitoring" {
   }
 
   ingress {
-    description = "Grafana"
+    description = "Grafana UI"
     from_port   = 3000
     to_port     = 3000
     protocol    = "tcp"
     cidr_blocks = [var.my_ip]
+  }
+
+  ingress {
+    description     = "SSH from Jenkins (Ansible control node)"
+    from_port       = 22
+    to_port         = 22
+    protocol        = "tcp"
+    security_groups = [aws_security_group.jenkins.id]
   }
 
   egress {

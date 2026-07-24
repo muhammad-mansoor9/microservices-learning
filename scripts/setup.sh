@@ -18,15 +18,19 @@ CONFIG_HOST=$(terraform output -raw config_server_private_ip)
 RABBITMQ_HOST=$(terraform output -raw rabbitmq_private_ip)
 KEYCLOAK_HOST=$(terraform output -raw keycloak_private_ip)
 ALB_DNS=$(terraform output -raw alb_dns_name)
+USER_SERVICE_HOST=$(terraform output -raw user_service_private_ip)
+PAYMENT_SERVICE_HOST=$(terraform output -raw payment_service_private_ip)
 
 echo ""
-echo "  Jenkins (public):  $JENKINS_IP"
-echo "  Config Server:     $CONFIG_HOST"
-echo "  Eureka Server:     $EUREKA_HOST"
-echo "  RabbitMQ:          $RABBITMQ_HOST"
-echo "  Keycloak:          $KEYCLOAK_HOST"
-echo "  RDS:               $RDS_HOST"
-echo "  ALB:               $ALB_DNS"
+echo "  Jenkins (public):     $JENKINS_IP"
+echo "  Config Server:        $CONFIG_HOST"
+echo "  Eureka Server:        $EUREKA_HOST"
+echo "  RabbitMQ:             $RABBITMQ_HOST"
+echo "  Keycloak:             $KEYCLOAK_HOST"
+echo "  RDS:                  $RDS_HOST"
+echo "  ALB:                  $ALB_DNS"
+echo "  User Service:         $USER_SERVICE_HOST"
+echo "  Payment Service:      $PAYMENT_SERVICE_HOST"
 echo ""
 
 # ---------- 2. Prompt for secrets --------------------------------------------
@@ -71,6 +75,8 @@ sed -i.bak \
   -e "s|defaultValue: '[^']*', description: 'Keycloak private IP'|defaultValue: '$KEYCLOAK_HOST', description: 'Keycloak private IP'|" \
   -e "s|defaultValue: '[^']*', description: 'PostgreSQL RDS host'|defaultValue: '$RDS_HOST', description: 'PostgreSQL RDS host'|" \
   -e "s|defaultValue: '[^']*', description: 'Keycloak issuer URI'|defaultValue: '$KEYCLOAK_ISSUER_URI', description: 'Keycloak issuer URI'|" \
+  -e "s|defaultValue: '[^']*', description: 'Private IP of user-service EC2.*'|defaultValue: '$USER_SERVICE_HOST', description: 'Private IP of user-service EC2 (from terraform output user_service_private_ip)'|" \
+  -e "s|defaultValue: '[^']*', description: 'Private IP of payment-service EC2.*'|defaultValue: '$PAYMENT_SERVICE_HOST', description: 'Private IP of payment-service EC2 (from terraform output payment_service_private_ip)'|" \
   "$JENKINSFILE"
 rm -f "$JENKINSFILE.bak"
 

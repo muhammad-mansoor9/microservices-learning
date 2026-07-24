@@ -5,8 +5,9 @@
 #   prometheus_version  — e.g. 2.53.0  (default below)
 #   grafana_version     — e.g. 11.1.0  (default below)
 #
-# The playbook resolves app-server private IPs from the dynamic inventory
-# (groups['app_servers']) and renders prometheus.yml.j2 with those IPs.
+# The playbook resolves service private IPs from the dynamic inventory
+# (groups['user_servers'], groups['payment_servers'], groups['order_servers'])
+# and renders prometheus.yml.j2 with those IPs.
 
 - name: Install Prometheus and Grafana on monitoring host
   hosts: monitoring

@@ -28,6 +28,26 @@ output "keycloak_private_ip" {
   value       = aws_instance.keycloak.private_ip
 }
 
+output "user_service_private_ip" {
+  description = "Private IP of the user-service instance"
+  value       = aws_instance.user_service.private_ip
+}
+
+output "payment_service_private_ip" {
+  description = "Private IP of the payment-service instance"
+  value       = aws_instance.payment_service.private_ip
+}
+
+output "order_service_private_ip" {
+  description = "Private IP of the order-service instance"
+  value       = aws_instance.order_service.private_ip
+}
+
+output "api_gateway_private_ip" {
+  description = "Private IP of the api-gateway instance"
+  value       = aws_instance.api_gateway.private_ip
+}
+
 output "monitoring_private_ip" {
   description = "Private IP of the Monitoring instance (Prometheus + Grafana)"
   value       = aws_instance.monitoring.private_ip

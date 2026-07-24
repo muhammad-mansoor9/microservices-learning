@@ -1,0 +1,5 @@
+# Service instances (user, payment, order, api-gateway) and the monitoring instance
+# all live in public subnets but Jenkins can only reach them via private IP —
+# the app/monitoring security groups restrict SSH to jenkins-sg only.
+ansible_host: "{{ private_ip_address }}"
+ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"

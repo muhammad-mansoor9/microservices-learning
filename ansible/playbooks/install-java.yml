@@ -1,6 +1,6 @@
 ---
 - name: Install Amazon Corretto 21 on all hosts
-  hosts: all:!monitoring:!app_servers
+  hosts: all:!monitoring:!user_servers:!payment_servers:!order_servers:!gateway_servers
   become: true
   gather_facts: true
 

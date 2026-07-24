@@ -6,6 +6,8 @@ volumes:
   localstack-data:
   postgres-data:
   rabbitmq-data:
+  prometheus-data:
+  grafana-data:
 
 services:
 
@@ -267,3 +269,38 @@ services:
       timeout: 5s
       retries: 10
       start_period: 60s
+
+  # ── Monitoring ──────────────────────────────────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - ms-network
+    depends_on:
+      - order-service
+      - payment-service
+      - user-service
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - ms-network
+    depends_on:
+      - prometheus

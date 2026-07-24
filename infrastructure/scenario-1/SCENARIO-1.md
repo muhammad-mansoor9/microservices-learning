@@ -25,7 +25,7 @@ When prompted, enter:
 - `db_password` — choose a strong password (you'll need it again in Step 2)
 - `my_ip` — your current public IP in CIDR form e.g. `203.0.113.5/32`
 
-Terraform provisions: VPC, subnets, ALB, ASG (app servers), Eureka EC2, Config EC2, RabbitMQ EC2, Keycloak EC2, Jenkins EC2, RDS PostgreSQL, S3 artifacts bucket, IAM roles.
+Terraform provisions: VPC, subnets, ALB, four dedicated EC2 instances (user-service, payment-service, order-service, api-gateway), Eureka EC2, Config EC2, RabbitMQ EC2, Keycloak EC2, Jenkins EC2, Monitoring EC2 (Prometheus + Grafana), RDS PostgreSQL, S3 artifacts bucket, IAM roles.
 
 > If S3 bucket already exists from a previous run:
 > ```bash
@@ -116,6 +116,8 @@ Go to **Manage Jenkins → Credentials → System → Global → Add Credential*
 
 Click **Build with Parameters**. All parameter defaults are pre-filled by the setup script. Click **Build**.
 
+> **Note:** `USER_SERVICE_HOST` and `PAYMENT_SERVICE_HOST` are also pre-filled by the setup script from `terraform output`. Verify them before building — order-service uses these to reach the other two services by private IP.
+
 The pipeline will:
 1. Build all 6 services (parallel Maven build)
 2. Upload JARs to S3
@@ -147,19 +149,22 @@ On next redeployment, start from Step 1. The setup script handles everything aut
 ```
 Internet
    │
-  ALB (public)
+  ALB (public, port 80)
    │
-  ASG App Server (public subnet)
-   ├── api-gateway     :8080
-   ├── order-service   :8083
-   ├── payment-service :8082
-   └── user-service    :8081
+  api-gateway EC2     (public subnet B) :8080
+   │  (Eureka-discovered routing)
+   ├── order-service EC2   (public subnet A) :8083
+   ├── payment-service EC2 (public subnet B) :8082
+   └── user-service EC2    (public subnet A) :8081
          │
          ├── Eureka Server    (private subnet A) :8761
          ├── Config Server    (private subnet A) :8888
          ├── RabbitMQ         (private subnet B) :5672
          ├── Keycloak         (private subnet B) :9090
-         └── RDS PostgreSQL   (private subnet)  :5432
+         └── RDS PostgreSQL   (private subnets)  :5432
+
+  Jenkins EC2    (public subnet A) — Ansible control node
+  Monitoring EC2 (public subnet B) — Prometheus :9090, Grafana :3000
 ```
 
-Jenkins EC2 (public subnet) is the Ansible control node — it SSHs to all instances over private IPs within the VPC.
+Each microservice runs on its own EC2 instance. Jenkins SSHs to all instances over private IPs within the VPC. The monitoring instance scrapes each service's `/actuator/prometheus` endpoint directly.

@@ -15,74 +15,97 @@ data "aws_ami" "al2023" {
   }
 }
 
-# Launch template for ASG (app services)
+# ── Application Services (one instance each, public subnets) ─────────────────
 
-resource "aws_launch_template" "app" {
-  name_prefix   = "ms-learning-app-"
-  image_id      = data.aws_ami.al2023.id
-  instance_type = "t3.small"
-  key_name      = "ms-learning-key"
+resource "aws_instance" "user_service" {
+  ami                         = data.aws_ami.al2023.id
+  instance_type               = "t3.small"
+  subnet_id                   = aws_subnet.public_a.id
+  key_name                    = "ms-learning-key"
+  vpc_security_group_ids      = [aws_security_group.app.id]
+  associate_public_ip_address = true
+  iam_instance_profile        = aws_iam_instance_profile.ec2.name
 
-  vpc_security_group_ids = [aws_security_group.app.id]
-
-  iam_instance_profile {
-    name = aws_iam_instance_profile.ec2.name
+  root_block_device {
+    volume_size           = 20
+    volume_type           = "gp3"
+    delete_on_termination = true
   }
 
-  block_device_mappings {
-    device_name = "/dev/xvda"
-    ebs {
-      volume_size           = 20
-      volume_type           = "gp3"
-      delete_on_termination = true
-    }
-  }
-
-  tag_specifications {
-    resource_type = "instance"
-    tags          = { Name = "ms-learning-app" }
-  }
-
-  lifecycle {
-    create_before_destroy = true
+  tags = {
+    Name     = "ms-learning-user-service"
+    Project  = "ms-learning"
+    Scenario = "ec2"
   }
 }
 
-# Auto Scaling Group
+resource "aws_instance" "payment_service" {
+  ami                         = data.aws_ami.al2023.id
+  instance_type               = "t3.small"
+  subnet_id                   = aws_subnet.public_b.id
+  key_name                    = "ms-learning-key"
+  vpc_security_group_ids      = [aws_security_group.app.id]
+  associate_public_ip_address = true
+  iam_instance_profile        = aws_iam_instance_profile.ec2.name
 
-resource "aws_autoscaling_group" "app" {
-  name                = "ms-learning-app-asg"
-  min_size            = 1
-  max_size            = 2
-  desired_capacity    = 1
-  vpc_zone_identifier = [aws_subnet.public_a.id, aws_subnet.public_b.id]
-  target_group_arns   = [aws_lb_target_group.app.arn]
-
-  launch_template {
-    id      = aws_launch_template.app.id
-    version = "$Latest"
+  root_block_device {
+    volume_size           = 20
+    volume_type           = "gp3"
+    delete_on_termination = true
   }
 
-  tag {
-    key                 = "Name"
-    value               = "ms-learning-app-asg"
-    propagate_at_launch = true
-  }
-
-  tag {
-    key                 = "Project"
-    value               = "ms-learning"
-    propagate_at_launch = true
-  }
-
-  tag {
-    key                 = "Scenario"
-    value               = "ec2"
-    propagate_at_launch = true
+  tags = {
+    Name     = "ms-learning-payment-service"
+    Project  = "ms-learning"
+    Scenario = "ec2"
   }
 }
 
-# Eureka Server (private subnet)
+resource "aws_instance" "order_service" {
+  ami                         = data.aws_ami.al2023.id
+  instance_type               = "t3.small"
+  subnet_id                   = aws_subnet.public_a.id
+  key_name                    = "ms-learning-key"
+  vpc_security_group_ids      = [aws_security_group.app.id]
+  associate_public_ip_address = true
+  iam_instance_profile        = aws_iam_instance_profile.ec2.name
+
+  root_block_device {
+    volume_size           = 20
+    volume_type           = "gp3"
+    delete_on_termination = true
+  }
+
+  tags = {
+    Name     = "ms-learning-order-service"
+    Project  = "ms-learning"
+    Scenario = "ec2"
+  }
+}
+
+resource "aws_instance" "api_gateway" {
+  ami                         = data.aws_ami.al2023.id
+  instance_type               = "t3.small"
+  subnet_id                   = aws_subnet.public_b.id
+  key_name                    = "ms-learning-key"
+  vpc_security_group_ids      = [aws_security_group.app.id]
+  associate_public_ip_address = true
+  iam_instance_profile        = aws_iam_instance_profile.ec2.name
+
+  root_block_device {
+    volume_size           = 20
+    volume_type           = "gp3"
+    delete_on_termination = true
+  }
+
+  tags = {
+    Name     = "ms-learning-api-gateway"
+    Project  = "ms-learning"
+    Scenario = "ec2"
+  }
+}
+
+# ── Spring Cloud Infrastructure (private subnets) ────────────────────────────
 
 resource "aws_instance" "eureka_server" {
   ami                    = data.aws_ami.al2023.id
@@ -101,8 +124,6 @@ resource "aws_instance" "eureka_server" {
   tags = { Name = "ms-learning-eureka-server" }
 }
 
-# Config Server (private subnet)
-
 resource "aws_instance" "config_server" {
   ami                    = data.aws_ami.al2023.id
   instance_type          = "t3.small"
@@ -119,8 +140,6 @@ resource "aws_instance" "config_server" {
 
   tags = { Name = "ms-learning-config-server" }
 }
-
-# RabbitMQ (private subnet)
 
 resource "aws_instance" "rabbitmq" {
   ami                    = data.aws_ami.al2023.id
@@ -139,8 +158,6 @@ resource "aws_instance" "rabbitmq" {
   tags = { Name = "ms-learning-rabbitmq" }
 }
 
-# Keycloak (private subnet)
-
 resource "aws_instance" "keycloak" {
   ami                    = data.aws_ami.al2023.id
   instance_type          = "t3.small"
@@ -158,7 +175,7 @@ resource "aws_instance" "keycloak" {
   tags = { Name = "ms-learning-keycloak" }
 }
 
-# Jenkins (public subnet)
+# ── Operations (public subnets) ──────────────────────────────────────────────
 
 resource "aws_instance" "jenkins" {
   ami                         = data.aws_ami.al2023.id
@@ -177,8 +194,6 @@ resource "aws_instance" "jenkins" {
 
   tags = { Name = "ms-learning-jenkins" }
 }
-
-# Monitoring — Prometheus + Grafana (public subnet)
 
 resource "aws_instance" "monitoring" {
   ami                         = data.aws_ami.al2023.id

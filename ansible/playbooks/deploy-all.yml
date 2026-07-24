@@ -3,16 +3,18 @@
 # passes its health check before the next one starts.
 #
 # Required extra vars (set by Jenkinsfile or passed manually):
-#   build_number        — Jenkins BUILD_NUMBER, locates JARs in S3
-#   s3_bucket           — S3 bucket name (default: ms-learning-artifacts)
-#   eureka_host         — private IP of the eureka-server EC2 instance
-#   config_host         — private IP of the config-server EC2 instance
-#   rabbitmq_host       — private IP of the RabbitMQ EC2 instance
-#   keycloak_host       — private IP of the Keycloak EC2 instance
-#   db_host             — private IP of the PostgreSQL server
-#   db_password         — PostgreSQL password
-#   keycloak_issuer_uri — e.g. http://<keycloak_host>:9090/realms/ms-learning
-#   config_repo_uri     — Git URI config-server uses for prod config files
+#   build_number          — Jenkins BUILD_NUMBER, locates JARs in S3
+#   s3_bucket             — S3 bucket name (default: ms-learning-artifacts)
+#   eureka_host           — private IP of the eureka-server EC2 instance
+#   config_host           — private IP of the config-server EC2 instance
+#   rabbitmq_host         — private IP of the RabbitMQ EC2 instance
+#   keycloak_host         — private IP of the Keycloak EC2 instance
+#   db_host               — private IP of the PostgreSQL server
+#   db_password           — PostgreSQL password
+#   keycloak_issuer_uri   — e.g. http://<keycloak_host>:9090/realms/ms-learning
+#   config_repo_uri       — Git URI config-server uses for prod config files
+#   user_service_host     — private IP of the user-service EC2 instance
+#   payment_service_host  — private IP of the payment-service EC2 instance
 
 # 1. Config Server
 - import_playbook: deploy-service.yml
@@ -39,92 +41,76 @@
     env_vars:
       SPRING_PROFILES_ACTIVE: prod
       SERVER_PORT: "8761"
-      # Eureka needs its own IP so it advertises the right hostname to clients
       EUREKA_HOSTNAME: "{{ eureka_host }}"
       INTERNAL_API_KEY: "{{ internal_api_key }}"
 
 # 3. User Service  (uses DynamoDB — no PostgreSQL needed)
 - import_playbook: deploy-service.yml
   vars:
-    target_hosts: app_servers
+    target_hosts: user_servers
     service_name: user-service
     service_port: 8081
     jar_s3_path: "s3://{{ s3_bucket | default('ms-learning-artifacts') }}/{{ build_number }}/user-service.jar"
     env_vars:
       SPRING_PROFILES_ACTIVE: prod
       SERVER_PORT: "8081"
-      # DynamoDB — credentials come from the EC2 instance IAM role automatically
       AWS_REGION: us-east-1
       USERS_TABLE: users
-      # Config Server
       SPRING_CLOUD_CONFIG_URI: "http://{{ config_host }}:8888"
-      # Eureka
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://{{ eureka_host }}:8761/eureka"
-      # Keycloak JWT
       KEYCLOAK_ISSUER_URI: "{{ keycloak_issuer_uri }}"
       INTERNAL_API_KEY: "{{ internal_api_key }}"
 
 # 4. Payment Service  (PostgreSQL + RabbitMQ)
 - import_playbook: deploy-service.yml
   vars:
-    target_hosts: app_servers
+    target_hosts: payment_servers
     service_name: payment-service
     service_port: 8082
     jar_s3_path: "s3://{{ s3_bucket | default('ms-learning-artifacts') }}/{{ build_number }}/payment-service.jar"
     env_vars:
       SPRING_PROFILES_ACTIVE: prod
       SERVER_PORT: "8082"
-      # PostgreSQL
       DATASOURCE_URL: "jdbc:postgresql://{{ db_host }}:5432/payment_db"
       DATASOURCE_USERNAME: postgres
       DATASOURCE_PASSWORD: "{{ db_password }}"
-      # RabbitMQ
       SPRING_RABBITMQ_HOST: "{{ rabbitmq_host }}"
       SPRING_RABBITMQ_PORT: "5672"
       SPRING_RABBITMQ_USERNAME: guest
       SPRING_RABBITMQ_PASSWORD: guest
-      # Config Server
       SPRING_CLOUD_CONFIG_URI: "http://{{ config_host }}:8888"
-      # Eureka
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://{{ eureka_host }}:8761/eureka"
-      # Keycloak JWT
       KEYCLOAK_ISSUER_URI: "{{ keycloak_issuer_uri }}"
       INTERNAL_API_KEY: "{{ internal_api_key }}"
 
 # 5. Order Service  (PostgreSQL + RabbitMQ, calls user-service and payment-service)
 - import_playbook: deploy-service.yml
   vars:
-    target_hosts: app_servers
+    target_hosts: order_servers
     service_name: order-service
     service_port: 8083
     jar_s3_path: "s3://{{ s3_bucket | default('ms-learning-artifacts') }}/{{ build_number }}/order-service.jar"
     env_vars:
       SPRING_PROFILES_ACTIVE: prod
       SERVER_PORT: "8083"
-      # PostgreSQL
       DB_URL: "jdbc:postgresql://{{ db_host }}:5432/order_db"
       DB_USERNAME: postgres
       DB_PASSWORD: "{{ db_password }}"
-      # RabbitMQ
       SPRING_RABBITMQ_HOST: "{{ rabbitmq_host }}"
       SPRING_RABBITMQ_PORT: "5672"
       SPRING_RABBITMQ_USERNAME: guest
       SPRING_RABBITMQ_PASSWORD: guest
-      # Inter-service calls — localhost works when all services share the same ASG instance
-      USER_SERVICE_URL: "http://localhost:8081"
-      PAYMENT_SERVICE_URL: "http://localhost:8082"
-      # Config Server
+      USER_SERVICE_URL: "http://{{ user_service_host }}:8081"
+      PAYMENT_SERVICE_URL: "http://{{ payment_service_host }}:8082"
       SPRING_CLOUD_CONFIG_URI: "http://{{ config_host }}:8888"
-      # Eureka
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://{{ eureka_host }}:8761/eureka"
-      # Keycloak JWT
       KEYCLOAK_ISSUER_URI: "{{ keycloak_issuer_uri }}"
       INTERNAL_API_KEY: "{{ internal_api_key }}"
 
 # 6. API Gateway  (last — routes all external traffic via Eureka)
 - import_playbook: deploy-service.yml
   vars:
-    target_hosts: app_servers
+    target_hosts: gateway_servers
     service_name: api-gateway
     service_port: 8080
     jar_s3_path: "s3://{{ s3_bucket | default('ms-learning-artifacts') }}/{{ build_number }}/api-gateway.jar"

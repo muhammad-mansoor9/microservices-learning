@@ -92,3 +92,13 @@ output "internal_alb_dns_name" {
   description = "DNS name of the internal ALB fronting payment and user services"
   value       = aws_lb.internal.dns_name
 }
+
+output "cloudwatch_dashboard_url" {
+  description = "AWS console URL for the CloudWatch dashboard"
+  value       = "https://${var.aws_region}.console.aws.amazon.com/cloudwatch/home?region=${var.aws_region}#dashboards:name=${aws_cloudwatch_dashboard.ecs.dashboard_name}"
+}
+
+output "alerts_sns_topic_arn" {
+  description = "ARN of the SNS topic that receives CloudWatch alarm notifications"
+  value       = aws_sns_topic.alerts.arn
+}

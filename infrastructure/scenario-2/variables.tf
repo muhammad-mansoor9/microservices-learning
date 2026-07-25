@@ -38,3 +38,9 @@ variable "github_branch" {
   type        = string
   default     = "scenario-2-ecs"
 }
+
+variable "alert_email_address" {
+  description = "Email address that receives CloudWatch alarm notifications via SNS. Leave empty to create the topic without a subscription."
+  type        = string
+  default     = ""
+}

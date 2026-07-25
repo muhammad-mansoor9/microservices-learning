@@ -9,9 +9,11 @@ terraform {
   }
 
   backend "s3" {
-    bucket = "ms-learning-terraform-state"
-    key    = "scenario2/terraform.tfstate"
-    region = "us-east-1"
+    bucket         = "microservices-learning-terraform-state-dev"
+    key            = "scenario2/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "microservices-learning-terraform-locks-dev"
+    encrypt        = true
   }
 }
 

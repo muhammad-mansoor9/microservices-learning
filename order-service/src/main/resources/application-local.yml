@@ -11,6 +11,7 @@ spring:
 services:
   user-service-url: http://localhost:8083
   payment-service-url: http://localhost:8082
+  internal-api-key: internal-secret
 
 management:
   endpoint:

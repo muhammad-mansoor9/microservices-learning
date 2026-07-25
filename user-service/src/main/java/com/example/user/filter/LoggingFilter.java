@@ -1,4 +1,4 @@
-package com.example.order.infrastructure.filter;
+package com.example.user.filter;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -11,23 +11,21 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 @Component
-public class TraceIdFilter extends OncePerRequestFilter {
+public class LoggingFilter extends OncePerRequestFilter {
 
-    public static final String TRACE_HEADER = "X-Amzn-Trace-Id";
+    private static final String TRACE_HEADER = "X-Amzn-Trace-Id";
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         String traceId = request.getHeader(TRACE_HEADER);
         if (traceId != null && !traceId.isBlank()) {
-            TraceIdHolder.set(traceId);
             MDC.put("traceId", traceId);
             response.setHeader(TRACE_HEADER, traceId);
         }
         try {
             filterChain.doFilter(request, response);
         } finally {
-            TraceIdHolder.clear();
             MDC.remove("traceId");
         }
     }

@@ -1,8 +1,10 @@
 spring:
+  config:
+    import: "aws-parameterstore:/ms-learning/"
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${/ms-learning/order/db-url}
+    username: ${/ms-learning/order/db-username}
+    password: ${/ms-learning/order/db-password}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -15,8 +17,11 @@ spring:
       ddl-auto: validate
 
 services:
-  user-service-url: ${USER_SERVICE_URL}
-  payment-service-url: ${PAYMENT_SERVICE_URL}
+  user-service-url: ${/ms-learning/user/url}
+  payment-service-url: ${/ms-learning/payment/url}
+
+aws:
+  region: us-east-1
 
 management:
   endpoint:

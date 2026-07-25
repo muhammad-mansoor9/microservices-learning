@@ -21,3 +21,20 @@ variable "alb_callback_domain" {
   type        = string
   default     = "placeholder.example.com"
 }
+
+variable "codestar_connection_arn" {
+  description = "ARN of the CodeStar Connections resource that grants CodePipeline read access to GitHub. Create once via AWS console (Developer Tools → Settings → Connections) and paste the ARN here."
+  type        = string
+}
+
+variable "github_repository_id" {
+  description = "GitHub repository in owner/repo form that CodePipeline should pull from"
+  type        = string
+  default     = "muhammad-mansoor9/microservices-learning"
+}
+
+variable "github_branch" {
+  description = "GitHub branch that CodePipeline should track"
+  type        = string
+  default     = "scenario-2-ecs"
+}

@@ -60,6 +60,11 @@ resource "aws_ecs_service" "order_service" {
   launch_type                       = "FARGATE"
   health_check_grace_period_seconds = 120
 
+  # Blue/green deployments driven by CodeDeploy (see cicd.tf)
+  deployment_controller {
+    type = "CODE_DEPLOY"
+  }
+
   network_configuration {
     subnets          = aws_subnet.private[*].id
     security_groups  = [aws_security_group.ecs_tasks.id]
@@ -70,11 +75,6 @@ resource "aws_ecs_service" "order_service" {
     target_group_arn = aws_lb_target_group.order_service.arn
     container_name   = "order-service"
     container_port   = 8080
-  }
-
-  deployment_circuit_breaker {
-    enable   = true
-    rollback = true
   }
 
   service_connect_configuration {
@@ -91,7 +91,13 @@ resource "aws_ecs_service" "order_service" {
     }
   }
 
-  depends_on = [aws_lb_listener.http]
+  depends_on = [aws_lb_listener.http, aws_lb_listener.http_test]
+
+  # CodeDeploy owns task_definition + load_balancer swaps after initial create;
+  # desired_count is autoscaled at runtime.
+  lifecycle {
+    ignore_changes = [task_definition, load_balancer, desired_count]
+  }
 
   tags = { Name = "${local.name_prefix}-order-service" }
 }
@@ -141,11 +147,16 @@ resource "aws_ecs_task_definition" "payment_service" {
 }
 
 resource "aws_ecs_service" "payment_service" {
-  name            = "payment-service"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.payment_service.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
+  name                              = "payment-service"
+  cluster                           = aws_ecs_cluster.main.id
+  task_definition                   = aws_ecs_task_definition.payment_service.arn
+  desired_count                     = 1
+  launch_type                       = "FARGATE"
+  health_check_grace_period_seconds = 120
+
+  deployment_controller {
+    type = "CODE_DEPLOY"
+  }
 
   network_configuration {
     subnets          = aws_subnet.private[*].id
@@ -153,9 +164,10 @@ resource "aws_ecs_service" "payment_service" {
     assign_public_ip = false
   }
 
-  deployment_circuit_breaker {
-    enable   = true
-    rollback = true
+  load_balancer {
+    target_group_arn = aws_lb_target_group.payment_service.arn
+    container_name   = "payment-service"
+    container_port   = 8080
   }
 
   service_connect_configuration {
@@ -170,6 +182,12 @@ resource "aws_ecs_service" "payment_service" {
         dns_name = "payment-service"
       }
     }
+  }
+
+  depends_on = [aws_lb_listener.payment_prod, aws_lb_listener.payment_test]
+
+  lifecycle {
+    ignore_changes = [task_definition, load_balancer, desired_count]
   }
 
   tags = { Name = "${local.name_prefix}-payment-service" }
@@ -220,11 +238,16 @@ resource "aws_ecs_task_definition" "user_service" {
 }
 
 resource "aws_ecs_service" "user_service" {
-  name            = "user-service"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.user_service.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
+  name                              = "user-service"
+  cluster                           = aws_ecs_cluster.main.id
+  task_definition                   = aws_ecs_task_definition.user_service.arn
+  desired_count                     = 1
+  launch_type                       = "FARGATE"
+  health_check_grace_period_seconds = 120
+
+  deployment_controller {
+    type = "CODE_DEPLOY"
+  }
 
   network_configuration {
     subnets          = aws_subnet.private[*].id
@@ -232,9 +255,10 @@ resource "aws_ecs_service" "user_service" {
     assign_public_ip = false
   }
 
-  deployment_circuit_breaker {
-    enable   = true
-    rollback = true
+  load_balancer {
+    target_group_arn = aws_lb_target_group.user_service.arn
+    container_name   = "user-service"
+    container_port   = 8080
   }
 
   service_connect_configuration {
@@ -249,6 +273,12 @@ resource "aws_ecs_service" "user_service" {
         dns_name = "user-service"
       }
     }
+  }
+
+  depends_on = [aws_lb_listener.user_prod, aws_lb_listener.user_test]
+
+  lifecycle {
+    ignore_changes = [task_definition, load_balancer, desired_count]
   }
 
   tags = { Name = "${local.name_prefix}-user-service" }

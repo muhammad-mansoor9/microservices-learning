@@ -1,0 +1,95 @@
+version: 0.2
+
+# CodeBuild buildspec — driven by CodePipeline.
+#
+# Env vars set by the CodeBuild project (see infrastructure/scenario-2/cicd.tf):
+#   AWS_DEFAULT_REGION, ACCOUNT_ID, ECR_REGISTRY
+#
+# Produces three artifact triplets — one per service — that the downstream
+# CodeDeployToECS actions consume:
+#   imagedefinitions-<svc>.json  (retained for reference / rolling-deploy compat)
+#   taskdef-<svc>.json           (task-definition template; image already substituted)
+#   appspec-<svc>.yaml           (CodeDeploy AppSpec pointing at the ECS service container)
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto21
+    commands:
+      - jq --version
+      - docker --version
+
+  pre_build:
+    commands:
+      - IMAGE_TAG=$(echo "$CODEBUILD_RESOLVED_SOURCE_VERSION" | cut -c1-7)
+      - echo "Building images tagged $IMAGE_TAG"
+      - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+  build:
+    commands:
+      - mvn -B -DskipTests package
+      - |
+        for svc in order-service payment-service user-service; do
+          ECR_URL="$ECR_REGISTRY/$svc"
+          echo "→ Building $svc image ($ECR_URL:$IMAGE_TAG)"
+          docker build -t "$ECR_URL:$IMAGE_TAG" -t "$ECR_URL:latest" -f "$svc/Dockerfile" "$svc"
+          docker push "$ECR_URL:$IMAGE_TAG"
+          docker push "$ECR_URL:latest"
+        done
+
+  post_build:
+    commands:
+      - |
+        for svc in order-service payment-service user-service; do
+          ECR_URL="$ECR_REGISTRY/$svc"
+          IMAGE_URI="$ECR_URL:$IMAGE_TAG"
+          TASK_FAMILY="ms-learning-$svc"
+
+          # imagedefinitions.json — retained for reference / rolling-deploy compatibility
+          printf '[{"name":"%s","imageUri":"%s"}]' "$svc" "$IMAGE_URI" > "imagedefinitions-$svc.json"
+
+          # taskdef.json — fetch the Terraform-registered task definition and
+          # rewrite the container image to the newly built tag. CodeDeploy will
+          # register this as a new revision and inject its ARN into appspec.
+          aws ecs describe-task-definition \
+              --task-definition "$TASK_FAMILY" \
+              --query 'taskDefinition' \
+            | jq --arg IMG "$IMAGE_URI" '
+                .containerDefinitions[0].image = $IMG
+                | del(
+                    .taskDefinitionArn,
+                    .revision,
+                    .status,
+                    .requiresAttributes,
+                    .compatibilities,
+                    .registeredAt,
+                    .registeredBy
+                  )
+              ' > "taskdef-$svc.json"
+
+          # appspec.yaml — CodeDeploy substitutes <TASK_DEFINITION> with the ARN
+          # it registers from taskdef-$svc.json.
+          cat > "appspec-$svc.yaml" <<APPSPEC
+        version: 0.0
+        Resources:
+          - TargetService:
+              Type: AWS::ECS::Service
+              Properties:
+                TaskDefinition: <TASK_DEFINITION>
+                LoadBalancerInfo:
+                  ContainerName: $svc
+                  ContainerPort: 8080
+        APPSPEC
+        done
+      - ls -la imagedefinitions-*.json taskdef-*.json appspec-*.yaml
+
+artifacts:
+  files:
+    - imagedefinitions-*.json
+    - taskdef-*.json
+    - appspec-*.yaml
+  discard-paths: yes
+
+cache:
+  paths:
+    - '/root/.m2/**/*'

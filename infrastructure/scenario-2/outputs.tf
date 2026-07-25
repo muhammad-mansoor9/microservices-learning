@@ -77,3 +77,18 @@ output "order_saga_state_machine_arn" {
   description = "ARN of the Order SAGA Step Functions state machine"
   value       = aws_sfn_state_machine.order_saga.arn
 }
+
+output "codepipeline_url" {
+  description = "AWS console URL for the CI/CD pipeline"
+  value       = "https://${var.aws_region}.console.aws.amazon.com/codesuite/codepipeline/pipelines/${aws_codepipeline.main.name}/view?region=${var.aws_region}"
+}
+
+output "codepipeline_artifacts_bucket" {
+  description = "S3 bucket that stores pipeline artifacts"
+  value       = aws_s3_bucket.codepipeline_artifacts.bucket
+}
+
+output "internal_alb_dns_name" {
+  description = "DNS name of the internal ALB fronting payment and user services"
+  value       = aws_lb.internal.dns_name
+}

@@ -15,3 +15,9 @@ variable "db_password" {
   type        = string
   sensitive   = true
 }
+
+variable "alb_callback_domain" {
+  description = "Domain used for Cognito ALB callback URLs (set to your ALB/custom domain when HTTPS is enabled)"
+  type        = string
+  default     = "placeholder.example.com"
+}

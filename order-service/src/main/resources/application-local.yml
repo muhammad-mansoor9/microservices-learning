@@ -11,7 +11,11 @@ spring:
 services:
   user-service-url: http://localhost:8083
   payment-service-url: http://localhost:8082
+  saga-state-machine-arn: arn:aws:states:us-east-1:000000000000:stateMachine:local-order-saga
   internal-api-key: internal-secret
+
+aws:
+  sfn-endpoint: http://localhost:4566
 
 management:
   endpoint:

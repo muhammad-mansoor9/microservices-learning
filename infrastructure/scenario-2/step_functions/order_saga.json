@@ -1,0 +1,92 @@
+{
+  "Comment": "Order processing SAGA with compensating transactions",
+  "StartAt": "ValidateUser",
+  "States": {
+    "ValidateUser": {
+      "Type": "Task",
+      "Resource": "${validate_user_lambda_arn}",
+      "ResultPath": "$.userValidation",
+      "Next": "ProcessPayment",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "OrderFailed"
+        }
+      ]
+    },
+    "ProcessPayment": {
+      "Type": "Task",
+      "Resource": "${process_payment_lambda_arn}",
+      "ResultPath": "$.payment",
+      "Next": "CheckPaymentStatus",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.paymentError",
+          "Next": "RefundPayment"
+        }
+      ]
+    },
+    "CheckPaymentStatus": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.payment.status",
+          "StringEquals": "APPROVED",
+          "Next": "ConfirmOrder"
+        }
+      ],
+      "Default": "RefundPayment"
+    },
+    "ConfirmOrder": {
+      "Type": "Task",
+      "Resource": "${confirm_order_lambda_arn}",
+      "ResultPath": "$.confirmation",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Next": "OrderComplete"
+    },
+    "RefundPayment": {
+      "Type": "Task",
+      "Resource": "${refund_payment_lambda_arn}",
+      "ResultPath": "$.refund",
+      "Next": "CancelOrder",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.refundError",
+          "Next": "CancelOrder"
+        }
+      ]
+    },
+    "CancelOrder": {
+      "Type": "Task",
+      "Resource": "${cancel_order_lambda_arn}",
+      "ResultPath": "$.cancellation",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Next": "OrderFailed"
+    },
+    "OrderComplete": {
+      "Type": "Succeed"
+    },
+    "OrderFailed": {
+      "Type": "Fail",
+      "Error": "OrderProcessingFailed",
+      "Cause": "Order processing failed - see execution history"
+    }
+  }
+}

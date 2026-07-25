@@ -50,16 +50,11 @@ resource "aws_ssm_parameter" "payment_db_password" {
   }
 }
 
-# Managed manually after Cognito pool is created in the console.
 resource "aws_ssm_parameter" "cognito_user_pool_id" {
   name  = "/ms-learning/cognito/user-pool-id"
   type  = "SecureString"
-  value = "placeholder"
+  value = aws_cognito_user_pool.main.id
   tags  = { Name = "cognito-user-pool-id" }
-
-  lifecycle {
-    ignore_changes = [value]
-  }
 }
 
 # Service Connect resolves these hostnames within the ECS cluster.
@@ -81,6 +76,6 @@ resource "aws_ssm_parameter" "user_url" {
 resource "aws_ssm_parameter" "user_dynamodb_table" {
   name  = "/ms-learning/user/dynamodb-table"
   type  = "String"
-  value = "users"
+  value = aws_dynamodb_table.users.name
   tags  = { Name = "user-dynamodb-table" }
 }

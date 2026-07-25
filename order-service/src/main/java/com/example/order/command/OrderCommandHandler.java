@@ -3,12 +3,7 @@ package com.example.order.command;
 import com.example.order.event.OrderCancelledEvent;
 import com.example.order.event.OrderConfirmedEvent;
 import com.example.order.event.OrderCreatedEvent;
-import com.example.order.event.OrderFailedEvent;
-import com.example.order.infrastructure.client.PaymentServiceClient;
 import com.example.order.infrastructure.client.UserServiceClient;
-import com.example.order.infrastructure.client.dto.PaymentRequest;
-import com.example.order.infrastructure.client.dto.PaymentResponse;
-import com.example.order.infrastructure.client.exception.PaymentServiceException;
 import com.example.order.infrastructure.client.exception.UserNotFoundException;
 import com.example.order.model.OrderEvent;
 import com.example.order.model.OrderEventRepository;
@@ -18,10 +13,14 @@ import com.example.order.readmodel.OrderStatus;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
+import software.amazon.awssdk.services.sfn.SfnClient;
+import software.amazon.awssdk.services.sfn.model.StartExecutionRequest;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -32,18 +31,21 @@ public class OrderCommandHandler {
     private final OrderRepository orderRepository;
     private final ObjectMapper objectMapper;
     private final UserServiceClient userServiceClient;
-    private final PaymentServiceClient paymentServiceClient;
+    private final SfnClient sfnClient;
     private final TransactionTemplate transactionTemplate;
 
+    @Value("${services.saga-state-machine-arn}")
+    private String stateMachineArn;
+
     public UUID handle(CreateOrderCommand command) {
-        // Phase 1: validate user — no DB connection held
+        // Validate user synchronously for fast failure before queuing the SAGA
         userServiceClient.findById(command.userId())
                 .orElseThrow(() -> new UserNotFoundException(command.userId()));
 
         UUID orderId = UUID.randomUUID();
         Instant now = Instant.now();
 
-        // Phase 2: write event + PENDING order, then commit — DB connection released
+        // Persist OrderCreatedEvent + PENDING read model atomically, then release DB connection
         transactionTemplate.executeWithoutResult(tx -> {
             appendEvent(orderId, "OrderCreated",
                     new OrderCreatedEvent(orderId, command.userId(), command.amount(), now));
@@ -56,34 +58,48 @@ public class OrderCommandHandler {
             orderRepository.save(order);
         });
 
-        // Phase 3: call payment — no DB connection held
-        try {
-            PaymentResponse response = paymentServiceClient.processPayment(
-                    new PaymentRequest(orderId, command.userId(), command.amount()));
-
-            if ("APPROVED".equals(response.status())) {
-                transactionTemplate.executeWithoutResult(tx -> finaliseOrder(orderId, OrderStatus.CONFIRMED, null));
-            } else {
-                transactionTemplate.executeWithoutResult(tx -> finaliseOrder(orderId, OrderStatus.FAILED, "Payment rejected"));
-            }
-        } catch (PaymentServiceException e) {
-            transactionTemplate.executeWithoutResult(tx -> finaliseOrder(orderId, OrderStatus.CANCELLED, "Payment service unavailable"));
-        }
+        // Fire-and-forget: Step Functions drives the rest of the SAGA asynchronously
+        String input = toJson(Map.of(
+                "orderId", orderId.toString(),
+                "userId",  command.userId().toString(),
+                "amount",  command.amount()
+        ));
+        sfnClient.startExecution(StartExecutionRequest.builder()
+                .stateMachineArn(stateMachineArn)
+                .name(orderId.toString())  // idempotent: one execution per order ID
+                .input(input)
+                .build());
 
         return orderId;
     }
 
-    private void finaliseOrder(UUID orderId, OrderStatus status, String reason) {
-        Order order = orderRepository.findById(orderId).orElseThrow();
-        order.setStatus(status);
-        Instant now = Instant.now();
-        switch (status) {
-            case CONFIRMED -> appendEvent(orderId, "OrderConfirmed", new OrderConfirmedEvent(orderId, now));
-            case FAILED    -> appendEvent(orderId, "OrderFailed",    new OrderFailedEvent(orderId, reason, now));
-            case CANCELLED -> appendEvent(orderId, "OrderCancelled", new OrderCancelledEvent(orderId, reason, now));
-            default -> { /* PENDING is set on creation; no terminal event needed */ }
+    /** Called by POST /api/orders/{id}/confirm (Step Functions ConfirmOrder state). */
+    public void confirm(UUID orderId) {
+        transactionTemplate.executeWithoutResult(tx -> {
+            Order order = orderRepository.findById(orderId).orElseThrow();
+            if (order.getStatus() == OrderStatus.CONFIRMED) return; // idempotent
+            order.setStatus(OrderStatus.CONFIRMED);
+            appendEvent(orderId, "OrderConfirmed", new OrderConfirmedEvent(orderId, Instant.now()));
+        });
+    }
+
+    /** Called by POST /api/orders/{id}/cancel (Step Functions CancelOrder state). */
+    public void cancel(UUID orderId) {
+        transactionTemplate.executeWithoutResult(tx -> {
+            Order order = orderRepository.findById(orderId).orElseThrow();
+            if (order.getStatus() == OrderStatus.CANCELLED) return; // idempotent
+            order.setStatus(OrderStatus.CANCELLED);
+            appendEvent(orderId, "OrderCancelled",
+                    new OrderCancelledEvent(orderId, "Cancelled by order SAGA", Instant.now()));
+        });
+    }
+
+    private String toJson(Object obj) {
+        try {
+            return objectMapper.writeValueAsString(obj);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to serialize SFN input", e);
         }
-        // no explicit save() — dirty checking flushes the status change at commit
     }
 
     private void appendEvent(UUID aggregateId, String eventType, Object payload) {

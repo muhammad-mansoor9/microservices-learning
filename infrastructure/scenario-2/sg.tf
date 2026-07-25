@@ -10,6 +10,13 @@ resource "aws_security_group" "alb" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -22,7 +29,7 @@ resource "aws_security_group" "alb" {
 
 resource "aws_security_group" "ecs_tasks" {
   name        = "${local.name_prefix}-ecs-tasks-sg"
-  description = "ECS tasks — ALB inbound and inter-service via Service Connect"
+  description = "ECS tasks - ALB inbound and inter-service via Service Connect"
   vpc_id      = aws_vpc.main.id
 
   ingress {

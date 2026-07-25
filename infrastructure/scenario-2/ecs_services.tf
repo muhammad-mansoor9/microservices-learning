@@ -14,8 +14,8 @@ resource "aws_ecs_task_definition" "order_service" {
   family                   = "${local.name_prefix}-order-service"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                      = 256
-  memory                   = 512
+  cpu                      = 512
+  memory                   = 1024
   execution_role_arn       = aws_iam_role.task_execution.arn
   task_role_arn            = aws_iam_role.order_service.arn
 
@@ -53,11 +53,12 @@ resource "aws_ecs_task_definition" "order_service" {
 }
 
 resource "aws_ecs_service" "order_service" {
-  name            = "order-service"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.order_service.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
+  name                              = "order-service"
+  cluster                           = aws_ecs_cluster.main.id
+  task_definition                   = aws_ecs_task_definition.order_service.arn
+  desired_count                     = 1
+  launch_type                       = "FARGATE"
+  health_check_grace_period_seconds = 120
 
   network_configuration {
     subnets          = aws_subnet.private[*].id
@@ -71,12 +72,18 @@ resource "aws_ecs_service" "order_service" {
     container_port   = 8080
   }
 
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
   service_connect_configuration {
     enabled   = true
     namespace = aws_service_discovery_private_dns_namespace.ms_learning.arn
 
     service {
-      port_name = "http"
+      port_name      = "http"
+      discovery_name = "order-service"
       client_alias {
         port     = 80
         dns_name = "order-service"
@@ -95,8 +102,8 @@ resource "aws_ecs_task_definition" "payment_service" {
   family                   = "${local.name_prefix}-payment-service"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                      = 256
-  memory                   = 512
+  cpu                      = 512
+  memory                   = 1024
   execution_role_arn       = aws_iam_role.task_execution.arn
   task_role_arn            = aws_iam_role.payment_service.arn
 
@@ -146,12 +153,18 @@ resource "aws_ecs_service" "payment_service" {
     assign_public_ip = false
   }
 
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
   service_connect_configuration {
     enabled   = true
     namespace = aws_service_discovery_private_dns_namespace.ms_learning.arn
 
     service {
-      port_name = "http"
+      port_name      = "http"
+      discovery_name = "payment-service"
       client_alias {
         port     = 80
         dns_name = "payment-service"
@@ -168,8 +181,8 @@ resource "aws_ecs_task_definition" "user_service" {
   family                   = "${local.name_prefix}-user-service"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                      = 256
-  memory                   = 512
+  cpu                      = 512
+  memory                   = 1024
   execution_role_arn       = aws_iam_role.task_execution.arn
   task_role_arn            = aws_iam_role.user_service.arn
 
@@ -219,12 +232,18 @@ resource "aws_ecs_service" "user_service" {
     assign_public_ip = false
   }
 
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
   service_connect_configuration {
     enabled   = true
     namespace = aws_service_discovery_private_dns_namespace.ms_learning.arn
 
     service {
-      port_name = "http"
+      port_name      = "http"
+      discovery_name = "user-service"
       client_alias {
         port     = 80
         dns_name = "user-service"

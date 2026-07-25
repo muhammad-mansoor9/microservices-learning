@@ -75,6 +75,13 @@ data "aws_iam_policy_document" "order_service" {
       "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/ms-learning/*"
     ]
   }
+
+  statement {
+    sid       = "StartSagaExecution"
+    effect    = "Allow"
+    actions   = ["states:StartExecution"]
+    resources = [aws_sfn_state_machine.order_saga.arn]
+  }
 }
 
 resource "aws_iam_role_policy" "order_service" {
@@ -143,9 +150,7 @@ data "aws_iam_policy_document" "user_service" {
       "dynamodb:Query",
       "dynamodb:Scan",
     ]
-    resources = [
-      "arn:aws:dynamodb:${var.aws_region}:${data.aws_caller_identity.current.account_id}:table/users"
-    ]
+    resources = [aws_dynamodb_table.users.arn]
   }
 
   statement {

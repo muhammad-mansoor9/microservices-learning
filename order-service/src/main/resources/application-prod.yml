@@ -19,6 +19,8 @@ spring:
 services:
   user-service-url: ${/ms-learning/user/url}
   payment-service-url: ${/ms-learning/payment/url}
+  saga-state-machine-arn: ${/ms-learning/order/saga-state-machine-arn}
+  internal-api-key: ${/ms-learning/order/internal-api-key}
 
 aws:
   region: us-east-1

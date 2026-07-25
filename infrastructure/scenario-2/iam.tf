@@ -82,6 +82,26 @@ data "aws_iam_policy_document" "order_service" {
     actions   = ["states:StartExecution"]
     resources = [aws_sfn_state_machine.order_saga.arn]
   }
+
+  statement {
+    sid       = "PublishCloudWatchMetrics"
+    effect    = "Allow"
+    actions   = ["cloudwatch:PutMetricData"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "cloudwatch:namespace"
+      values   = ["MsLearning"]
+    }
+  }
+
+  statement {
+    sid       = "XRayWrite"
+    effect    = "Allow"
+    actions   = ["xray:PutTraceSegments", "xray:PutTelemetryRecords", "xray:GetSamplingRules", "xray:GetSamplingTargets"]
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_role_policy" "order_service" {
@@ -123,6 +143,13 @@ data "aws_iam_policy_document" "payment_service" {
       "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/ms-learning/*"
     ]
   }
+
+  statement {
+    sid       = "XRayWrite"
+    effect    = "Allow"
+    actions   = ["xray:PutTraceSegments", "xray:PutTelemetryRecords", "xray:GetSamplingRules", "xray:GetSamplingTargets"]
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_role_policy" "payment_service" {
@@ -160,6 +187,13 @@ data "aws_iam_policy_document" "user_service" {
     resources = [
       "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/ms-learning/*"
     ]
+  }
+
+  statement {
+    sid       = "XRayWrite"
+    effect    = "Allow"
+    actions   = ["xray:PutTraceSegments", "xray:PutTelemetryRecords", "xray:GetSamplingRules", "xray:GetSamplingTargets"]
+    resources = ["*"]
   }
 }
 

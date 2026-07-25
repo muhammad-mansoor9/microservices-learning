@@ -1,5 +1,6 @@
 package com.example.order.command;
 
+import com.amazonaws.xray.AWSXRay;
 import com.example.order.event.OrderCancelledEvent;
 import com.example.order.event.OrderConfirmedEvent;
 import com.example.order.event.OrderCreatedEvent;
@@ -13,9 +14,15 @@ import com.example.order.readmodel.OrderStatus;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
+import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient;
+import software.amazon.awssdk.services.cloudwatch.model.MetricDatum;
+import software.amazon.awssdk.services.cloudwatch.model.PutMetricDataRequest;
+import software.amazon.awssdk.services.cloudwatch.model.StandardUnit;
 import software.amazon.awssdk.services.sfn.SfnClient;
 import software.amazon.awssdk.services.sfn.model.StartExecutionRequest;
 
@@ -27,11 +34,15 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OrderCommandHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(OrderCommandHandler.class);
+    private static final String METRICS_NAMESPACE = "MsLearning";
+
     private final OrderEventRepository orderEventRepository;
     private final OrderRepository orderRepository;
     private final ObjectMapper objectMapper;
     private final UserServiceClient userServiceClient;
     private final SfnClient sfnClient;
+    private final CloudWatchAsyncClient cloudWatchAsyncClient;
     private final TransactionTemplate transactionTemplate;
 
     @Value("${services.saga-state-machine-arn}")
@@ -39,8 +50,16 @@ public class OrderCommandHandler {
 
     public UUID handle(CreateOrderCommand command) {
         // Validate user synchronously for fast failure before queuing the SAGA
-        userServiceClient.findById(command.userId())
-                .orElseThrow(() -> new UserNotFoundException(command.userId()));
+        AWSXRay.beginSubsegment("user-service-call");
+        try {
+            userServiceClient.findById(command.userId())
+                    .orElseThrow(() -> new UserNotFoundException(command.userId()));
+        } catch (Exception e) {
+            AWSXRay.getCurrentSubsegment().addException(e);
+            throw e;
+        } finally {
+            AWSXRay.endSubsegment();
+        }
 
         UUID orderId = UUID.randomUUID();
         Instant now = Instant.now();
@@ -64,13 +83,43 @@ public class OrderCommandHandler {
                 "userId",  command.userId().toString(),
                 "amount",  command.amount()
         ));
-        sfnClient.startExecution(StartExecutionRequest.builder()
-                .stateMachineArn(stateMachineArn)
-                .name(orderId.toString())  // idempotent: one execution per order ID
-                .input(input)
-                .build());
+        AWSXRay.beginSubsegment("saga-start");
+        try {
+            sfnClient.startExecution(StartExecutionRequest.builder()
+                    .stateMachineArn(stateMachineArn)
+                    .name(orderId.toString())  // idempotent: one execution per order ID
+                    .input(input)
+                    .build());
+        } catch (Exception e) {
+            AWSXRay.getCurrentSubsegment().addException(e);
+            throw e;
+        } finally {
+            AWSXRay.endSubsegment();
+        }
+
+        publishOrdersCreatedMetric();
 
         return orderId;
+    }
+
+    private void publishOrdersCreatedMetric() {
+        try {
+            PutMetricDataRequest request = PutMetricDataRequest.builder()
+                    .namespace(METRICS_NAMESPACE)
+                    .metricData(MetricDatum.builder()
+                            .metricName("OrdersCreated")
+                            .unit(StandardUnit.COUNT)
+                            .value(1.0)
+                            .build())
+                    .build();
+            cloudWatchAsyncClient.putMetricData(request)
+                    .exceptionally(ex -> {
+                        log.warn("Failed to publish OrdersCreated metric: {}", ex.getMessage());
+                        return null;
+                    });
+        } catch (Exception e) {
+            log.warn("Failed to submit OrdersCreated metric: {}", e.getMessage());
+        }
     }
 
     /** Called by POST /api/orders/{id}/confirm (Step Functions ConfirmOrder state). */

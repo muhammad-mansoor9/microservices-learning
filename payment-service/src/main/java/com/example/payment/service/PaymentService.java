@@ -1,5 +1,6 @@
 package com.example.payment.service;
 
+import com.amazonaws.xray.AWSXRay;
 import com.example.payment.dto.CreatePaymentRequest;
 import com.example.payment.dto.PaymentResponse;
 import com.example.payment.model.Payment;
@@ -20,25 +21,33 @@ public class PaymentService {
 
     @Transactional
     public PaymentResponse createPayment(CreatePaymentRequest request) {
-        Payment payment = Payment.builder()
-                .orderId(request.orderId())
-                .userId(request.userId())
-                .amount(request.amount())
-                .status(PaymentStatus.PENDING.name())
-                .build();
+        AWSXRay.beginSubsegment("payment-processing");
+        try {
+            Payment payment = Payment.builder()
+                    .orderId(request.orderId())
+                    .userId(request.userId())
+                    .amount(request.amount())
+                    .status(PaymentStatus.PENDING.name())
+                    .build();
 
-        payment = paymentRepository.save(payment);
+            payment = paymentRepository.save(payment);
 
-        // Mock approval logic
-        if (request.amount().compareTo(new BigDecimal("10000")) < 0) {
-            payment.setStatus(PaymentStatus.APPROVED.name());
-        } else {
-            payment.setStatus(PaymentStatus.FAILED.name());
+            // Mock approval logic
+            if (request.amount().compareTo(new BigDecimal("10000")) < 0) {
+                payment.setStatus(PaymentStatus.APPROVED.name());
+            } else {
+                payment.setStatus(PaymentStatus.FAILED.name());
+            }
+
+            payment = paymentRepository.save(payment);
+
+            return new PaymentResponse(payment.getId(), payment.getStatus());
+        } catch (Exception e) {
+            AWSXRay.getCurrentSubsegment().addException(e);
+            throw e;
+        } finally {
+            AWSXRay.endSubsegment();
         }
-
-        payment = paymentRepository.save(payment);
-
-        return new PaymentResponse(payment.getId(), payment.getStatus());
     }
 
     @Transactional

@@ -65,12 +65,46 @@ CodePipeline needs a signed connection to your GitHub account. You create this *
 
 > **Naming note.** AWS renamed the *CodeStar Connections* service to **AWS CodeConnections** in July 2024, when the parent CodeStar project service was fully shut down. The capability is unchanged — same OAuth flow, same GitHub App, same behaviour — only the service name and ARN prefix changed. Pre-rename ARNs (starting `arn:aws:codestar-connections:…`) still work; new connections use `arn:aws:codeconnections:…`. The Terraform in this repo accepts either.
 
-1. Open the AWS console → **Developer Tools → Settings → Connections**. (The page's header now reads *"AWS CodeConnections"*.)
-2. **Create connection** → *GitHub* → give it a name like `github-microservices-learning`.
-3. Click **Connect to GitHub**, install the AWS Connector GitHub App on your account/org, grant it access to the `microservices-learning` repo.
-4. On the connection detail page, the status flips to **Available**. Copy the **ARN** — for connections created after July 2024 it looks like `arn:aws:codeconnections:us-east-1:123456789012:connection/abcdef01-2345-6789-abcd-ef0123456789`.
+**Step-by-step (~5 minutes):**
 
-You'll paste this into `terraform.tfvars` in step 4.
+1. **Open the connections page.** AWS console → **Developer Tools → Settings → Connections**. The page's header now reads *"AWS CodeConnections"*.
+
+2. **Click "Create connection."**
+
+3. **Pick the use case.** AWS asks how you plan to use the connection. Three options appear:
+   - *Set up GitHub Actions self-hosted runners* — ❌ not us, we don't use GitHub Actions.
+   - *Start builds from your repositories* (direct CodeBuild trigger) — ❌ not us, our CodeBuild is invoked *by* CodePipeline, not by GitHub webhooks.
+   - *Trigger a release* (AWS CodePipeline) — ✅ **pick this one**, matches our architecture exactly.
+
+   The selection only guides the wizard's follow-up screens — the resulting connection ARN works for any AWS service that supports CodeConnections, so the choice isn't binding.
+
+4. **Provider = GitHub.** Give the connection a memorable name, e.g. `github-microservices-learning`. Click **Connect to GitHub**.
+
+5. **Install the AWS Connector GitHub App.** AWS shows an "App installation" dropdown. First time through you'll see **"No results"** — that's expected, because the AWS Connector isn't installed on your GitHub yet.
+
+   Click **"Install a new app."** A new tab opens on GitHub:
+
+   1. Log in to GitHub if you aren't already.
+   2. GitHub asks *"Where do you want to install AWS Connector?"* — pick the account/org that owns the `microservices-learning` repo (for this project, your personal account `muhammad-mansoor9`).
+   3. Under **"Repository access"** choose one of:
+      - *All repositories* — simplest for a personal account
+      - *Only select repositories* → tick `microservices-learning`
+   4. Click **Install & Authorize**.
+   5. GitHub redirects you back to the AWS tab. The dropdown now shows the app installation you just made.
+
+6. **Select the app** in the dropdown and click **Connect** at the bottom of the AWS page.
+
+7. **Wait for status = Available.** The connection lands in `Pending` briefly, then flips to **`Available`**. If it stays `Pending`, the GitHub App install didn't finish — reopen the GitHub tab and confirm the install completed.
+
+8. **Copy the ARN** from the connection detail page. For new connections it looks like:
+   ```
+   arn:aws:codeconnections:us-east-1:311902596266:connection/abcdef01-2345-6789-abcd-ef0123456789
+   ```
+   (An older `arn:aws:codestar-connections:…` from before the rename works too — the Terraform grants both IAM action forms.)
+
+You'll paste this ARN into `terraform.tfvars` in step 4.
+
+> **Do not use the "Create pipeline" wizard.** The AWS console also offers to walk you through creating a pipeline with templates like *"Push to ECR"*, *"Deploy to ECS Fargate"*, *"Terraform Deploy To AWS"*, etc. **Skip all of those.** Our Terraform in `infrastructure/scenario-2/cicd.tf` provisions the entire pipeline (source → build → three deploy stages, IAM roles, CodeBuild project, three CodeDeploy applications, artifact bucket) when you run `terraform apply`. Creating a pipeline manually here would either duplicate the resources or drift from Terraform state. The **only** thing you need the console for at this step is the connection above.
 
 ### 2.2 Optional — decide on an alert email
 

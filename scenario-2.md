@@ -831,7 +831,7 @@ CodePipeline is a **workflow orchestrator**. It doesn't build or deploy anything
 Conceptual dataflow:
 ```
 GitHub (source)
-   ↓ [CodeStar connection webhooks CodePipeline]
+   ↓ [CodeConnections webhook fires CodePipeline]
    ↓ [CodePipeline zips repo → S3 artifact bucket → source_output]
 CodeBuild (build)
    ↓ [runs buildspec.yml, produces docker images + JSON files → S3 → build_output]
@@ -847,7 +847,7 @@ ECS services updated
 Versioning matters because artifacts are keyed by pipeline execution ID — CodePipeline needs to fetch specific object versions for auditing. Also: `force_destroy = true` is dangerous in prod (it lets Terraform wipe a bucket with content); we accept it for learning cleanup.
 
 **Three IAM roles:**
-- `codepipeline` — assumed by CodePipeline. Can read/write the artifact bucket, `codestar-connections:UseConnection` on the GitHub connection, start CodeBuild, create CodeDeploy deployments, describe/update ECS, PassRole.
+- `codepipeline` — assumed by CodePipeline. Can read/write the artifact bucket, `codeconnections:UseConnection` (and the legacy alias `codestar-connections:UseConnection`) on the GitHub connection, start CodeBuild, create CodeDeploy deployments, describe/update ECS, PassRole.
 - `codebuild` — assumed by CodeBuild. Logs, artifact bucket, `ecr:GetAuthorizationToken` (unscoped, required for docker login), ECR push actions scoped to the three service repos, SSM read on `/ms-learning/*`, `ecs:DescribeTaskDefinition` (so the buildspec can fetch the current task-def revision).
 - `codedeploy` — assumed by CodeDeploy. Attached `AWSCodeDeployRoleForECS` managed policy.
 
@@ -872,7 +872,7 @@ Each deployment group is configured for:
 **`DEPLOYMENT_STOP_ON_ALARM`** ties CodeDeploy to CloudWatch alarms. If you associate an alarm with the deployment group (not done in this codebase — good next step), CodeDeploy monitors it during the bake period and rolls back if it fires. This is how you build safe deploys: if your new version starts throwing 5xx, the alarm fires, CodeDeploy rolls back automatically, incident averted.
 
 **The pipeline** (`aws_codepipeline.main`) has five stages:
-1. **Source** — CodeStar Source Connection provider polling GitHub (`var.codestar_connection_arn`, `var.github_repository_id`, `var.github_branch`).
+1. **Source** — CodePipeline's `CodeStarSourceConnection` action (the provider string AWS kept stable through the CodeConnections rename) polling GitHub via the ARN in `var.codeconnections_arn`, plus `var.github_repository_id` and `var.github_branch`.
 2. **Build** — CodeBuild action, input `source_output`, output `build_output`.
 3. **Deploy-Order** — CodeDeployToECS provider consuming `taskdef-order-service.json` + `appspec-order-service.yaml` from `build_output`.
 4. **Deploy-Payment** — same, for payment-service.
@@ -882,9 +882,11 @@ The deploys run **sequentially** — user-service only starts after payment-serv
 
 **Why sequential? Two reasons:** (1) a failed deploy in one service should stop the pipeline before you touch the others — you get a chance to fix. (2) In a real system there's often ordering (deploy the database migration service before the app services). Parallel is faster but louder on failure.
 
-### CodeStar Connection: the manual bit
+### AWS CodeConnections: the manual bit
 
-CodePipeline reads from GitHub via a **CodeStar Connection**. You create the connection in the AWS console once, authenticate it with GitHub (grant the AWS Connector GitHub app access to your repos), and paste the ARN into `var.codestar_connection_arn`. Terraform cannot create this because the GitHub authentication step needs an interactive browser flow.
+CodePipeline reads from GitHub via an **AWS CodeConnections** connection (this is the service formerly called *CodeStar Connections* — AWS renamed it in July 2024 when the parent CodeStar project service was shut down; capability and OAuth flow are unchanged, only the name and ARN prefix). You create the connection in the AWS console once, authenticate it with GitHub (grant the AWS Connector GitHub app access to your repos), and paste the ARN into `var.codeconnections_arn`. Terraform cannot create this because the GitHub authentication step needs an interactive browser flow.
+
+Two ARN prefixes are valid in this repo — pre-rename connections start `arn:aws:codestar-connections:…` and continue to work; new ones start `arn:aws:codeconnections:…`. The IAM policy in `cicd.tf` grants both action names so either works.
 
 ### `buildspec.yml` — what CodeBuild actually runs
 
@@ -919,7 +921,7 @@ Every input the operator supplies:
 - `aws_region` (default `us-east-1`).
 - `db_username` (default `mslearning`) and `db_password` (sensitive, no default — you must supply).
 - `alb_callback_domain` — Cognito redirect URL host, placeholder until you have HTTPS.
-- `codestar_connection_arn` — the pre-created CodeStar Connection ARN for CodePipeline. No default; you must create it in the console once and paste the ARN.
+- `codeconnections_arn` — the pre-created AWS CodeConnections ARN for CodePipeline (formerly "CodeStar Connections" before the July 2024 rename). No default; you must create it in the console once and paste the ARN.
 - `github_repository_id` (default `muhammad-mansoor9/microservices-learning`) and `github_branch` (default `scenario-2-ecs`).
 - `alert_email_address` (default `""`) — controls whether the SNS subscription is created.
 

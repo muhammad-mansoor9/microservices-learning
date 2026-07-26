@@ -22,8 +22,8 @@ variable "alb_callback_domain" {
   default     = "placeholder.example.com"
 }
 
-variable "codestar_connection_arn" {
-  description = "ARN of the CodeStar Connections resource that grants CodePipeline read access to GitHub. Create once via AWS console (Developer Tools → Settings → Connections) and paste the ARN here."
+variable "codeconnections_arn" {
+  description = "ARN of the AWS CodeConnections resource that grants CodePipeline read access to GitHub. (Formerly 'CodeStar Connections'; renamed by AWS in July 2024 when the CodeStar project service was shut down. The underlying capability is unchanged; ARNs now use the codeconnections: prefix but legacy codestar-connections: ARNs still work.) Create once via AWS console (Developer Tools → Settings → Connections) and paste the ARN here."
   type        = string
 }
 

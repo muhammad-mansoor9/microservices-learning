@@ -59,14 +59,16 @@ git checkout scenario-2-ecs
 
 Two things Terraform cannot create for you, because they require human authorization in a browser.
 
-### 2.1 Create a CodeStar Connection to GitHub
+### 2.1 Create an AWS CodeConnections connection to GitHub
 
 CodePipeline needs a signed connection to your GitHub account. You create this **once per account**, then reuse the ARN.
 
-1. Open the AWS console → **Developer Tools → Settings → Connections**.
+> **Naming note.** AWS renamed the *CodeStar Connections* service to **AWS CodeConnections** in July 2024, when the parent CodeStar project service was fully shut down. The capability is unchanged — same OAuth flow, same GitHub App, same behaviour — only the service name and ARN prefix changed. Pre-rename ARNs (starting `arn:aws:codestar-connections:…`) still work; new connections use `arn:aws:codeconnections:…`. The Terraform in this repo accepts either.
+
+1. Open the AWS console → **Developer Tools → Settings → Connections**. (The page's header now reads *"AWS CodeConnections"*.)
 2. **Create connection** → *GitHub* → give it a name like `github-microservices-learning`.
 3. Click **Connect to GitHub**, install the AWS Connector GitHub App on your account/org, grant it access to the `microservices-learning` repo.
-4. On the connection detail page, the status flips to **Available**. Copy the **ARN** (looks like `arn:aws:codestar-connections:us-east-1:123456789012:connection/abcdef01-...`).
+4. On the connection detail page, the status flips to **Available**. Copy the **ARN** — for connections created after July 2024 it looks like `arn:aws:codeconnections:us-east-1:123456789012:connection/abcdef01-2345-6789-abcd-ef0123456789`.
 
 You'll paste this into `terraform.tfvars` in step 4.
 
@@ -111,17 +113,19 @@ You will not touch this stack again unless you decide to change the state backen
 ```bash
 cd ../scenario-2
 cat > terraform.tfvars <<'EOF'
-db_password             = "ChangeMe_StrongPassword_123!"
-codestar_connection_arn = "arn:aws:codestar-connections:us-east-1:123456789012:connection/abcdef01-2345-..."
+db_password         = "ChangeMe_StrongPassword_123!"
+codeconnections_arn = "arn:aws:codeconnections:us-east-1:123456789012:connection/abcdef01-2345-..."
 
 # Optional — leave empty to skip the email subscription
-alert_email_address     = "you@example.com"
+alert_email_address = "you@example.com"
 
 # Optional — override defaults if you forked or renamed the repo
-# github_repository_id  = "your-user/microservices-learning"
-# github_branch         = "scenario-2-ecs"
+# github_repository_id = "your-user/microservices-learning"
+# github_branch        = "scenario-2-ecs"
 EOF
 ```
+
+If you already have a pre-July-2024 connection whose ARN starts `arn:aws:codestar-connections:…`, paste that instead — the Terraform grants IAM for both forms.
 
 **Do not commit `terraform.tfvars`.** It contains the DB password. The `.gitignore` at repo root already excludes it.
 
@@ -533,7 +537,7 @@ git commit -m "test: kick pipeline"
 git push origin scenario-2-ecs
 ```
 
-CodePipeline detects the push (via the CodeStar connection) within seconds. Watch the stages:
+CodePipeline detects the push (via the CodeConnections integration) within seconds. Watch the stages:
 1. **Source** (~5s) — GitHub webhook fires, artifact copied to S3.
 2. **Build** (~4–6 min) — CodeBuild runs `buildspec.yml`: mvn package, docker build ×3, docker push ×3, generate `taskdef-*.json` + `appspec-*.yaml`.
 3. **Deploy-Order** (~5–8 min) — CodeDeploy blue/green: launches a new task set on the green TG, runs health checks, then swaps the ALB listener from blue to green in one go (AllAtOnce). Old task set stays around for 5 min before termination.
@@ -626,7 +630,7 @@ terraform destroy
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `Error: Missing required argument … codestar_connection_arn` | Forgot to set the var. | Add to `terraform.tfvars` (step 4). |
+| `Error: Missing required argument … codeconnections_arn` | Forgot to set the var. | Add to `terraform.tfvars` (step 4). |
 | `InvalidClientTokenId: The security token included in the request is invalid` | AWS credentials expired (SSO). | `aws sso login` (or refresh your creds) and retry. |
 | `SubnetsIndexOutOfBounds` on ALB | Region has < 2 AZs available. | Change `var.aws_region` to a region with ≥ 2 AZs. |
 | `CannotPullContainerError` on ECS tasks | ECR repos empty. | Run step 6 (seed ECR) then step 7 (force redeploy). |
@@ -661,7 +665,7 @@ Most often a Lambda proxy can't reach the target ECS service. Check the Lambda's
 
 ### CodePipeline stuck on Source
 
-The CodeStar Connection must be in **Available** state. Console → Developer Tools → Settings → Connections. If it says *Pending*, click through and complete the GitHub install.
+The CodeConnections connection must be in **Available** state. Console → Developer Tools → Settings → Connections. If it says *Pending*, click through and complete the GitHub App install.
 
 ### CodeDeploy stage fails
 

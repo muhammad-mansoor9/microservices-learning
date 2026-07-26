@@ -1,6 +1,6 @@
 # ══════════════════════════════════════════════════════════════════════════════
 # CI/CD pipeline:
-#   GitHub (CodeStar Connection) → CodeBuild → CodeDeploy (blue/green per service)
+#   GitHub (AWS CodeConnections) → CodeBuild → CodeDeploy (blue/green per service)
 # ══════════════════════════════════════════════════════════════════════════════
 
 # ── Artifact Bucket ───────────────────────────────────────────────────────────
@@ -72,10 +72,15 @@ data "aws_iam_policy_document" "codepipeline" {
   }
 
   statement {
-    sid       = "CodeStarConnection"
-    effect    = "Allow"
-    actions   = ["codestar-connections:UseConnection"]
-    resources = [var.codestar_connection_arn]
+    sid    = "CodeConnectionsUse"
+    effect = "Allow"
+    actions = [
+      # New action name after the July 2024 rename (CodeStar Connections → CodeConnections)
+      "codeconnections:UseConnection",
+      # Legacy alias — kept so pipelines pointing at pre-rename ARNs still work
+      "codestar-connections:UseConnection",
+    ]
+    resources = [var.codeconnections_arn]
   }
 
   statement {
@@ -422,7 +427,9 @@ resource "aws_codepipeline" "main" {
       output_artifacts = ["source_output"]
 
       configuration = {
-        ConnectionArn        = var.codestar_connection_arn
+        # CodePipeline's action provider string is still "CodeStarSourceConnection" —
+        # AWS kept the identifier stable across the CodeConnections rename.
+        ConnectionArn        = var.codeconnections_arn
         FullRepositoryId     = var.github_repository_id
         BranchName           = var.github_branch
         DetectChanges        = "true"

@@ -35,7 +35,7 @@ Scenario 2 replaces every one of those decisions with an **AWS-managed equivalen
 | Concern | Scenario 1 (VM-era) | Scenario 2 (cloud-native) |
 |---|---|---|
 | Compute | EC2 + Auto Scaling Groups | **ECS Fargate** (serverless containers) |
-| Service discovery | **Eureka** (JVM registry) | **ECS Service Connect** + **AWS Cloud Map** (DNS-based) |
+| Service discovery | **Eureka** (JVM registry) | **ECS Service Registries** + **AWS Cloud Map** (DNS-based; see §5 for why not Service Connect) |
 | Configuration | **Spring Cloud Config Server** (Git-backed) | **AWS Systems Manager Parameter Store** |
 | Messaging | **RabbitMQ** (self-hosted broker) | **Amazon SQS** (managed queues) |
 | Auth | **Keycloak** (self-hosted IdP) | **Amazon Cognito** (managed IdP) |
@@ -91,7 +91,7 @@ client → external ALB (port 80, Cognito auth optional)
                 ▼
          order-service (ECS Fargate task)
                 │
-                ├─ Service Connect DNS ──▶ user-service (ECS Fargate)
+                ├─ Cloud Map DNS ────────▶ user-service (ECS Fargate)
                 │                              │
                 │                              ▼
                 │                         DynamoDB (users table)
@@ -102,7 +102,7 @@ client → external ALB (port 80, Cognito auth optional)
                 │                       Lambda proxies (validate/process/confirm/refund/cancel)
                 │                              │
                 │                              ▼
-                │                     order-service or payment-service (via Service Connect)
+                │                     order-service or payment-service (via Cloud Map DNS)
                 │                              │
                 │                              ▼
                 │                        RDS PostgreSQL
@@ -112,7 +112,7 @@ client → external ALB (port 80, Cognito auth optional)
 
 Two structural things to notice up front:
 
-1. **There is no api-gateway service in Scenario 2.** The ALB terminates client traffic and Cognito handles auth at the edge. Cross-service traffic goes through Service Connect (Envoy sidecar injected by ECS) — no gateway JVM in the hot path.
+1. **There is no api-gateway service in Scenario 2.** The ALB terminates client traffic and Cognito handles auth at the edge. Cross-service traffic goes through Cloud Map DNS (`<svc>.ms-learning.local:8080`) — no gateway JVM in the hot path.
 2. **The order SAGA is orchestrated by Step Functions, not by chained RabbitMQ events.** In Scenario 1 each service listens for the previous step's event; in Scenario 2 a state machine explicitly moves through states and knows how to run compensations.
 
 ### Why the api-gateway went away
@@ -312,7 +312,7 @@ We define four security groups:
 - **`aws_security_group.ecs_tasks`** — the ECS tasks themselves. Three ingress rules:
   1. From `alb` SG on 8080 (external ALB reaches order-service).
   2. From `internal_alb` SG on 8080 (internal ALB reaches payment/user).
-  3. From itself on all ports (Service Connect Envoy-to-Envoy traffic between services in the same SG).
+  3. From itself on all ports (service-to-service traffic between tasks in the same SG).
 - **`aws_security_group.rds`** — PostgreSQL port 5432 open only to `ecs_tasks` SG. RDS is otherwise unreachable from anywhere.
 
 > **Deeper dive — SG vs NACL.** AWS gives you two firewall layers. Security groups are per-ENI, stateful, allow-list only. Network ACLs are per-subnet, stateless, and support both allow and deny rules. In 99% of cases you use SGs alone; NACLs come out for regulated environments where you need explicit deny rules ("no traffic to 10.0.0.0/8 leaves the VPC") or as a defence-in-depth against SG misconfiguration.
@@ -342,11 +342,10 @@ A **cluster** is a logical group; it does not create any compute by itself (Farg
 
 Two resources:
 - `aws_ecs_cluster.main` — enables Container Insights (extra CloudWatch metrics on task-level CPU/memory). Container Insights costs about $2/task/month; skip it in cost-sensitive envs, keep it in learning envs so you can see what's happening.
-- `aws_service_discovery_private_dns_namespace.ms_learning` — creates a private DNS zone `ms-learning.local` inside the VPC. Service Connect writes service records into it, and Lambdas / other consumers resolve `order-service.ms-learning.local` to reach tasks.
+- `aws_service_discovery_private_dns_namespace.ms_learning` — creates a private DNS zone `ms-learning.local` inside the VPC.
+- `aws_service_discovery_service.services` — a `for_each` map producing three Cloud Map services (`order-service`, `payment-service`, `user-service`). Each ECS service references its Cloud Map counterpart via `service_registries { registry_arn = ... }` (see `ecs_services.tf`). ECS registers each running task's ENI IP against these Cloud Map services, so peer resolution of `<svc>.ms-learning.local` returns the IP list of healthy tasks.
 
-The cluster also has `service_connect_defaults` pointing at the namespace, so services don't need to repeat it.
-
-**Cloud Map is the underlying service-discovery primitive.** ECS Service Connect is really just "ECS wires up Cloud Map for you and injects an Envoy sidecar." You can use Cloud Map directly (with EC2, Lambda, on-prem, whatever) — but Service Connect is the ergonomic version if you're on ECS.
+**Cloud Map is the underlying service-discovery primitive** — ECS Service Registries just wire up the ECS-side plumbing that populates it. `MULTIVALUE` routing on each service means DNS returns up to 8 healthy task IPs per query, giving basic client-side round-robin at the resolver layer.
 
 ### `ecs_services.tf` — task definitions and services
 
@@ -364,7 +363,7 @@ This is the heart of the compute stack. For each service (order, payment, user) 
 - **Two IAM roles** — the crucial distinction:
   - `execution_role_arn` = "role the ECS *agent* uses to pull the image and write logs." Same role for all services. Think of this as the "outside-the-container" identity — what AWS itself uses to bootstrap your task.
   - `task_role_arn` = "role the *container process* uses when it calls AWS APIs (SQS, SSM, DynamoDB, X-Ray, ...)." One per service, principle of least privilege. Inside the container, the AWS SDK resolves this role automatically via the ECS credentials endpoint (`http://169.254.170.2/creds`) — you never handle keys.
-- `container_definitions` is a JSON block declaring the container: image (pointed at ECR `:latest`), ports (8080 named `http` so Service Connect can route to it), env vars (`SPRING_PROFILES_ACTIVE=prod`, `AWS_REGION`), and log config (see below).
+- `container_definitions` is a JSON block declaring the container: image (pointed at ECR `:latest`), ports (8080, given the name `http` for readability), env vars (`SPRING_PROFILES_ACTIVE=prod`, `AWS_REGION`), and log config (see below).
 
 > **Deeper dive — why two roles?** Because they run at different points in the task lifecycle with different threat models. The execution role runs *before* your code exists — if your image itself is malicious, this role's scope shouldn't matter (it's just "pull my image"). The task role runs *inside* your code — if your image is malicious, this role is what the attacker gets. Splitting them means a broadly-scoped execution role (needed to pull from any of your ECR repos) doesn't leak into your service's runtime permissions.
 
@@ -379,10 +378,20 @@ This is the heart of the compute stack. For each service (order, payment, user) 
 - `health_check_grace_period_seconds = 120` — how long the ALB waits before considering the target unhealthy. Spring Boot cold-start can take 60–90s; without a grace period, tasks are killed mid-boot and the service loop-crashes.
 - `network_configuration` — the private subnets and the `ecs_tasks` SG. `assign_public_ip = false`.
 - `load_balancer { … }` block wires the service to its **blue** target group only; CodeDeploy manages the green side at runtime.
-- `service_connect_configuration` — turns on the Envoy sidecar and registers a Cloud Map service named after the discovery_name. Peers reach it as `http://<discovery-name>/` on port 80 (Envoy sidecar listens on 80 inside the client task and forwards to 8080 on the server task).
+- `service_registries { registry_arn = aws_service_discovery_service.services["<svc>"].arn }` — registers each running task's ENI IP in the matching Cloud Map service. Peers resolve `<svc>.ms-learning.local` via ordinary DNS, getting one or more task IPs back, and speak HTTP directly to port 8080. No sidecar, no proxy.
 - `lifecycle { ignore_changes = [task_definition, load_balancer, desired_count] }` — CodeDeploy rewrites these during blue/green swaps, and desired_count may change via autoscaling. Terraform must not undo those changes on the next apply.
 
-> **Deeper dive — what is the Envoy sidecar?** When you enable Service Connect on a service, ECS launches a second container in every task: `aws-service-connect-envoy`. It listens on the client-alias port (80 in our config) inside the task. When your app code calls `http://order-service/api/…`, DNS resolves `order-service` to the sidecar's local IP (127.0.0.1 range), the sidecar looks up healthy backends in Cloud Map, and proxies the request. Benefits: client-side load balancing, automatic retries, per-connection metrics, mTLS-ready (though we don't turn it on here). Cost: ~50 MB extra memory per task and a proxy hop.
+> **Deeper dive — why not Service Connect?** ECS has two service-discovery patterns:
+>
+> **Service Connect** (the modern, opinionated one) injects an Envoy proxy sidecar into every task. Callers connect to the sidecar on localhost; the sidecar handles DNS lookup, client-side load balancing across multiple backends, retries, circuit breaking, per-connection metrics, and is ready for mTLS. Ergonomic short-name DNS (`http://user-service:80`).
+>
+> **Service Registries** (the older, plainer one — what we use) has no sidecar. ECS just registers each task's IP in Cloud Map. Callers do plain DNS resolution and speak HTTP directly. No retries, no client-side LB beyond what the DNS resolver returns, no per-connection metrics.
+>
+> Both use the same Cloud Map namespace and produce the same `<svc>.ms-learning.local` DNS names.
+>
+> **We can't use Service Connect here because AWS forbids combining it with `deployment_controller = CODE_DEPLOY`** — the API rejects the resource with `ClientException: DeploymentController#type CODE_DEPLOY is not supported by ECS Service Connect`. The technical reason: CodeDeploy blue/green runs two task sets (blue + green) side-by-side, and Envoy sidecars in client tasks would discover both versions in Cloud Map and load-balance across them — defeating the "atomic traffic swap" that blue/green promises. Rather than build the machinery to retarget every sidecar in the fleet atomically, AWS chose to reject the combination.
+>
+> This scenario prioritises the blue/green deploy pattern (more educational for production practices), so we sacrifice the sidecar's features. If we scaled up and needed retries or east-west metrics badly enough, the fix would be to switch to ECS rolling deploys (dropping CodeDeploy) and turn Service Connect back on.
 
 **Contrast with Scenario 1.** Scenario 1's equivalent is an Ansible playbook that SSHes into an EC2 instance, drops a systemd unit for `order-service.jar`, and calls `systemctl restart`. There is no notion of a "task definition revision" or "desired count" — you just have processes. ECS gives you resource limits, restart policy, log routing, IAM identity, and rolling deployment all in one declarative object.
 
@@ -570,7 +579,7 @@ The listener rule chain works like: "if request matches `path = /api/orders/*`, 
 
 **Internal ALB** (`aws_lb.internal`, `internal = true`, private subnets):
 
-Introduced when we added CodeDeploy blue/green for the two internal services. Blue/green on ECS **requires** a load balancer per service — CodeDeploy needs a listener to swap between blue and green. Payment and user services were previously reachable only via Service Connect (peer-to-peer inside the VPC); to give CodeDeploy something to flip, we added this internal-only ALB.
+Introduced when we added CodeDeploy blue/green for the two internal services. Blue/green on ECS **requires** a load balancer per service — CodeDeploy needs a listener to swap between blue and green. Payment and user services were originally intended to be reached peer-to-peer (via Service Connect); once we hit the CodeDeploy incompatibility we needed another route for CodeDeploy to shift traffic through, so this internal ALB now doubles as the swap target and (optionally) an east-west route.
 
 - 4 TGs total (`payment_service`, `payment_service_green`, `user_service`, `user_service_green`).
 - 4 listeners: payment prod (80), payment test (8080), user prod (81), user test (8081) — different ports so both services share one ALB.

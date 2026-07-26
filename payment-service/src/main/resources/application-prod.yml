@@ -4,9 +4,9 @@ spring:
   config:
     import: "aws-parameterstore:/ms-learning/"
   datasource:
-    url: ${/ms-learning/payment/db-url}
-    username: ${/ms-learning/payment/db-username}
-    password: ${/ms-learning/payment/db-password}
+    url: ${payment.db-url}
+    username: ${payment.db-username}
+    password: ${payment.db-password}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:

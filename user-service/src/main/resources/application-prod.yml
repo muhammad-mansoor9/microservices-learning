@@ -7,7 +7,7 @@ aws:
   region: us-east-1
   endpoint-override: ""
   dynamodb:
-    table-name: ${/ms-learning/user/dynamodb-table:users}
+    table-name: ${user.dynamodb-table:users}
 management:
   endpoints:
     web:

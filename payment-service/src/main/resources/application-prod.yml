@@ -10,7 +10,10 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: validate
+      # Learning-mode: Hibernate creates missing tables on first boot.
+      # For a real prod system, swap to `validate` and manage schema
+      # via Flyway/Liquibase migrations.
+      ddl-auto: update
     show-sql: false
     properties:
       hibernate:

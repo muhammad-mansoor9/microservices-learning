@@ -14,7 +14,10 @@ spring:
       max-lifetime: 1800000
   jpa:
     hibernate:
-      ddl-auto: validate
+      # Learning-mode: Hibernate creates missing tables on first boot.
+      # For a real prod system, swap to `validate` and manage schema
+      # via Flyway/Liquibase migrations.
+      ddl-auto: update
 
 services:
   user-service-url: ${user.url}

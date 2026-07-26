@@ -685,6 +685,8 @@ Terraform models both:
 - **Payment service**: SQS on `payment_events`, SSM read, X-Ray write.
 - **User service**: DynamoDB actions on the users table, SSM read, X-Ray write.
 
+Every task role also carries a **`KMSDecryptForSSM`** statement — `kms:Decrypt` on `*`, scoped by the `kms:ViaService = ssm.<region>.amazonaws.com` condition. This is the non-obvious piece: our secrets in Parameter Store are stored as `SecureString`, encrypted with the AWS-managed key `alias/aws/ssm`. Spring Cloud AWS calls `GetParametersByPath` with `WithDecryption=true`, and without `kms:Decrypt` that call returns `AccessDenied` on the KMS side — Spring then silently leaves every `${…}` placeholder unresolved, and the app dies far downstream (Hibernate's *"Unable to determine Dialect without JDBC metadata"* is the classic symptom, because the datasource URL resolved to empty). The `kms:ViaService` condition keeps the grant scoped so the role can only decrypt via SSM, not by calling KMS directly.
+
 ### Three lessons here
 
 1. **`sts:AssumeRole` with the `ecs-tasks.amazonaws.com` service principal** is the AWS pattern for handing a role to an ECS task. It's the same trust-relationship template repeated three times — that's why we hoist it into a `data "aws_iam_policy_document" "ecs_task_assume_role"` block and reference it from each `assume_role_policy`.
@@ -865,7 +867,7 @@ Versioning matters because artifacts are keyed by pipeline execution ID — Code
 **CodeBuild project `ms-learning-build`:**
 - Image `aws/codebuild/standard:7.0`, `BUILD_GENERAL1_MEDIUM` (7 GB RAM, 4 vCPU), `privileged_mode = true` (needed for `docker build`).
 - Env vars: `AWS_DEFAULT_REGION`, `ACCOUNT_ID`, `ECR_REGISTRY` (the account's ECR host).
-- Buildspec loaded via `file("${path.module}/../../buildspec.yml")` — a single source of truth for the build steps (see next section).
+- `source.buildspec` is intentionally **unset** so CodeBuild reads `buildspec.yml` from the root of the source artifact at every run. The earlier form — `buildspec = file("${path.module}/../../buildspec.yml")` — inlines the file's contents into the CodeBuild resource at *plan time*, which means any edit to `buildspec.yml` needs `terraform apply` before it takes effect. That's a very silent foot-gun on a learning project. Reading from the artifact instead keeps pipeline-only edits a `git push` away.
 - Logs into its own `/ms-learning/codebuild` log group.
 
 **Why `privileged_mode = true`?** CodeBuild runs your build inside a Docker container. `docker build` inside that container needs `docker in docker` (DinD) — starting new containers from within one. That requires the outer container to be privileged (broad kernel capabilities). It's the standard pattern for "build a Docker image inside CI" and only carries a real risk if untrusted code runs on the CodeBuild host.
@@ -903,7 +905,9 @@ Four phases:
 
 1. **install** — pins `java: corretto21` runtime.
 2. **pre_build** — computes `IMAGE_TAG = ${CODEBUILD_RESOLVED_SOURCE_VERSION:0:7}` (the first 7 chars of the git SHA), does `aws ecr get-login-password | docker login`.
-3. **build** — `mvn -B -DskipTests package`, then loops over the three services running `docker build`, `docker tag`, `docker push $ECR_URL:$IMAGE_TAG`, `docker push $ECR_URL:latest`.
+3. **build** — `mvn -B -DskipTests package`, then loops over the three services running `docker build`, `docker tag`, `docker push $ECR_URL:$IMAGE_TAG`, `docker push $ECR_URL:latest`. Two things worth calling out:
+   - **Build context is `.` (repo root), not `<svc>/`.** Each Dockerfile starts with `COPY pom.xml .` followed by `COPY <peer>/pom.xml <peer>/pom.xml` for all three services — those paths only resolve if Docker sees the entire multi-module tree. Passing just the service directory as context yields `failed to compute cache key … not found` on every `COPY`.
+   - **`ECR_URL` includes the repo prefix.** ECR repos are created as `ms-learning/<svc>` (see `ecr.tf`: `name = "${local.name_prefix}/${each.key}"`), and ECS task definitions resolve the image via `aws_ecr_repository.services[<svc>].repository_url`, which already carries the prefix. The buildspec therefore builds `ECR_URL="$ECR_REGISTRY/ms-learning/$svc"` — dropping the prefix pushes to a repo the CodeBuild role has no permission on (`AccessDenied on ecr:InitiateLayerUpload`) and produces an image URI ECS can't pull.
 4. **post_build** — for each service, generates three artifacts:
    - `imagedefinitions-<svc>.json` — the `[{"name":"<svc>","imageUri":"…"}]` format (retained for reference / rolling-deploy compat).
    - `taskdef-<svc>.json` — fetched via `aws ecs describe-task-definition`, `jq` rewrites `containerDefinitions[0].image` to the new SHA-tagged URI and strips read-only fields (`taskDefinitionArn`, `revision`, ...). CodeDeploy will register this as a new task-def revision on deploy.

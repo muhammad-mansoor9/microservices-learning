@@ -706,6 +706,35 @@ The CodeConnections connection must be in **Available** state. Console → Devel
 Open the failed deployment in the console. The **Events** tab shows which lifecycle hook failed:
 - **BeforeInstall** — usually a permissions issue on the deployment role.
 - **AfterAllowTestTraffic / AfterAllowTraffic** — health checks on the green TG never went healthy. Check the target-group health page and the ECS task log group.
+- **Install stuck for 10+ minutes** — the replacement task set can't reach a running state. Almost always an app startup crash (see next section) or a `CannotPullContainerError` (image tag missing in ECR). Look at the "Replacement" task set's stopped tasks.
+
+### CodeBuild fails on `docker build` / `docker push`
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `COPY <svc>/pom.xml: not found` on every service | Docker context was `$svc` (service dir), but each Dockerfile references sibling modules relative to repo root. | `docker build … -f "$svc/Dockerfile" .` — the trailing `.` passes the repo root as context. |
+| `docker push … AccessDenied on ecr:InitiateLayerUpload` | Pushing to `<svc>` without the `ms-learning/` prefix; that repo doesn't exist, and the CodeBuild role's `ECRPush` policy only lists the prefixed ARNs. | Set `ECR_URL="$ECR_REGISTRY/ms-learning/$svc"` (both in the `build` and `post_build` blocks — each has its own local binding). |
+| Buildspec edit pushed to git but pipeline still runs the old commands | The CodeBuild project has `source.buildspec = file(…)` in Terraform, which inlines the file at plan time. | Either `terraform apply` after every buildspec edit, or (recommended) drop the `buildspec = …` attribute — CodeBuild then reads `buildspec.yml` from the source artifact each run. See `cicd.tf`. |
+
+### Order-service (or any service) crashes with Hibernate "Unable to determine Dialect"
+
+Symptom in the CloudWatch log stream:
+```
+Unable to determine Dialect without JDBC metadata (please set 'jakarta.persistence.jdbc.url' …)
+```
+
+The datasource URL resolved to empty because Spring Cloud AWS couldn't decrypt the `SecureString` SSM parameters. The task role needs `kms:Decrypt` on the AWS-managed key `alias/aws/ssm` — see `iam.tf` for the `KMSDecryptForSSM` statement (`kms:ViaService = ssm.<region>.amazonaws.com` condition). If missing, `GetParametersByPath WithDecryption=true` fails `AccessDenied` at the KMS layer, and Spring silently leaves every `${…}` placeholder unresolved.
+
+Diagnostic:
+```bash
+# From your own CLI identity — confirms the params exist and are populated:
+aws ssm get-parameters-by-path --path /ms-learning/order --with-decryption \
+  --query 'Parameters[].{name:Name,type:Type}' --output table
+```
+
+If they exist but the container still crashes, the task role — not your CLI identity — is what's lacking the KMS grant. `terraform apply` after adding the statement, then re-run the pipeline (a `git push` alone won't fix a live task set; the app needs a new deploy to reload SSM).
+
+> **Why does user-service look fine while order-service crashes?** user-service's only SSM ref uses a default (`${/ms-learning/user/dynamodb-table:users}`) *and* that particular parameter is plain `String` type, not `SecureString`. The KMS-decrypt bug is invisible for it. Order-service has neither escape hatch — every placeholder is a SecureString with no default.
 
 ---
 

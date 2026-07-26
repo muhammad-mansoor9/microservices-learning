@@ -76,6 +76,23 @@ data "aws_iam_policy_document" "order_service" {
     ]
   }
 
+  # Required because our /ms-learning/* SSM parameters are SecureString and
+  # Spring Cloud AWS calls GetParameter* WithDecryption=true. Without this
+  # the SSM call fails AccessDenied on the underlying KMS key, Spring leaves
+  # placeholders unresolved, and the app dies on an empty datasource URL.
+  statement {
+    sid       = "KMSDecryptForSSM"
+    effect    = "Allow"
+    actions   = ["kms:Decrypt"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["ssm.${var.aws_region}.amazonaws.com"]
+    }
+  }
+
   statement {
     sid       = "StartSagaExecution"
     effect    = "Allow"
@@ -145,6 +162,19 @@ data "aws_iam_policy_document" "payment_service" {
   }
 
   statement {
+    sid       = "KMSDecryptForSSM"
+    effect    = "Allow"
+    actions   = ["kms:Decrypt"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["ssm.${var.aws_region}.amazonaws.com"]
+    }
+  }
+
+  statement {
     sid       = "XRayWrite"
     effect    = "Allow"
     actions   = ["xray:PutTraceSegments", "xray:PutTelemetryRecords", "xray:GetSamplingRules", "xray:GetSamplingTargets"]
@@ -187,6 +217,19 @@ data "aws_iam_policy_document" "user_service" {
     resources = [
       "arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/ms-learning/*"
     ]
+  }
+
+  statement {
+    sid       = "KMSDecryptForSSM"
+    effect    = "Allow"
+    actions   = ["kms:Decrypt"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["ssm.${var.aws_region}.amazonaws.com"]
+    }
   }
 
   statement {

@@ -1,5 +1,8 @@
 server:
-  port: 8082
+  # ECS task definition + ALB target group both use 8080 for every service.
+  # The 8082 default in the parent application.yml is for docker-compose
+  # host-port disambiguation only.
+  port: 8080
 spring:
   config:
     import: "aws-parameterstore:/ms-learning/"

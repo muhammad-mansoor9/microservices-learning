@@ -3,6 +3,11 @@ output "alb_dns_name" {
   value       = aws_lb.main.dns_name
 }
 
+output "ecs_cluster_name" {
+  description = "Name of the ECS cluster"
+  value       = aws_ecs_cluster.main.name
+}
+
 output "ecr_order_service_url" {
   description = "ECR repository URL for order-service"
   value       = aws_ecr_repository.services["order-service"].repository_url

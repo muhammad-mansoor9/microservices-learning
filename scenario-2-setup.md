@@ -27,6 +27,16 @@
 
 ---
 
+## 0. Working-directory convention
+
+Every shell command in this runbook assumes you are in **`infrastructure/scenario-2/`** unless a section explicitly says otherwise (only §3 uses `infrastructure/bootstrap/`, and §6 briefly steps to the repo root for the initial ECR push). Run this once and stay there:
+
+```bash
+cd <repo-root>/infrastructure/scenario-2
+```
+
+If you `cd` elsewhere between sections, the `terraform output …` calls will fail with *"no such file or directory"* — that's what the errors mean, not a broken command.
+
 ## 1. Prerequisites
 
 **On your machine:**
@@ -233,7 +243,7 @@ Each row should show `latest` with a recent timestamp.
 Force ECS to redeploy the services now that images exist:
 
 ```bash
-CLUSTER=$(terraform -chdir=infrastructure/scenario-2 output -raw ecs_cluster_name 2>/dev/null || echo "ms-learning-cluster")
+CLUSTER=$(terraform output -raw ecs_cluster_name 2>/dev/null || echo "ms-learning")
 
 for svc in order-service payment-service user-service; do
   aws ecs update-service --cluster $CLUSTER --service $svc --force-new-deployment >/dev/null
@@ -271,7 +281,7 @@ Expect `healthy` for each blue TG. Health checks take ~60s after the task shows 
 If you supplied `alert_email_address`, check your inbox for **"AWS Notification - Subscription Confirmation"**. Click the confirmation link. Verify:
 
 ```bash
-TOPIC_ARN=$(terraform -chdir=infrastructure/scenario-2 output -raw alerts_sns_topic_arn)
+TOPIC_ARN=$(terraform output -raw alerts_sns_topic_arn)
 aws sns list-subscriptions-by-topic --topic-arn $TOPIC_ARN \
   --query 'Subscriptions[].{endpoint:Endpoint,status:SubscriptionArn}' --output table
 ```
@@ -283,8 +293,8 @@ aws sns list-subscriptions-by-topic --topic-arn $TOPIC_ARN \
 We use the `api_test` client (no secret) to authenticate against the API.
 
 ```bash
-POOL_ID=$(terraform -chdir=infrastructure/scenario-2 output -raw cognito_user_pool_id)
-CLIENT_ID=$(terraform -chdir=infrastructure/scenario-2 output -raw cognito_api_test_client_id)
+POOL_ID=$(terraform output -raw cognito_user_pool_id)
+CLIENT_ID=$(terraform output -raw cognito_api_test_client_id)
 
 # Create the user
 aws cognito-idp admin-create-user \
@@ -320,7 +330,7 @@ The `ID_TOKEN` variable is used in the tests below.
 The order-service validates that `userId` exists in DynamoDB before it starts a SAGA. Create one user record directly with the CLI so we don't need to test the user-service admin flow first.
 
 ```bash
-TABLE=$(terraform -chdir=infrastructure/scenario-2 output -raw dynamodb_users_table)
+TABLE=$(terraform output -raw dynamodb_users_table)
 
 aws dynamodb put-item --table-name $TABLE \
   --item '{"userId":{"S":"11111111-1111-1111-1111-111111111111"},"email":{"S":"test@example.com"},"name":{"S":"Test User"},"tier":{"S":"REGULAR"}}'
@@ -345,7 +355,7 @@ Step Functions runs:
 ### 9.1 Fire the request
 
 ```bash
-ALB=$(terraform -chdir=infrastructure/scenario-2 output -raw alb_dns_name)
+ALB=$(terraform output -raw alb_dns_name)
 
 ORDER_ID=$(curl -sS -X POST "http://$ALB/api/orders" \
   -H "Authorization: Bearer $ID_TOKEN" \
@@ -360,7 +370,7 @@ The response is the raw UUID (order-service returns it in the body of the 202). 
 ### 9.2 Watch the SAGA execute
 
 ```bash
-SFN_ARN=$(terraform -chdir=infrastructure/scenario-2 output -raw order_saga_state_machine_arn)
+SFN_ARN=$(terraform output -raw order_saga_state_machine_arn)
 
 # Executions are named after the orderId (idempotency)
 aws stepfunctions describe-execution \
@@ -473,7 +483,7 @@ We'll simulate a bad deploy in [§12.2](#122-bad-deploy--auto-rollback). Skip fo
 ### 11.1 CloudWatch dashboard
 
 ```bash
-open "$(terraform -chdir=infrastructure/scenario-2 output -raw cloudwatch_dashboard_url)"
+open "$(terraform output -raw cloudwatch_dashboard_url)"
 ```
 
 After running the tests above you should see:
@@ -559,7 +569,7 @@ If you subscribed via email, you'll receive a message within ~30 seconds. Alarm 
 ### 12.1 First pipeline run
 
 ```bash
-open "$(terraform -chdir=infrastructure/scenario-2 output -raw codepipeline_url)"
+open "$(terraform output -raw codepipeline_url)"
 ```
 
 **Kick off a run** by making any trivial change and pushing:
@@ -606,7 +616,7 @@ Since the pipeline tracks `scenario-2-ecs`, it won't trigger from this branch. T
 ```bash
 # In infrastructure/scenario-2/terraform.tfvars, change:
 #   github_branch = "test/bad-deploy"
-terraform -chdir=infrastructure/scenario-2 apply
+terraform apply
 ```
 
 Push another commit to `test/bad-deploy` to fire the pipeline. Expected behaviour:
@@ -618,7 +628,7 @@ Push another commit to `test/bad-deploy` to fire the pipeline. Expected behaviou
 ```bash
 # Reset the branch in terraform.tfvars, push a fix, apply
 git checkout scenario-2-ecs
-terraform -chdir=infrastructure/scenario-2 apply
+terraform apply
 git branch -D test/bad-deploy
 git push origin --delete test/bad-deploy
 ```
@@ -674,7 +684,7 @@ terraform destroy
 
 ```bash
 # Check the stopped task's reason
-CLUSTER=ms-learning-cluster
+CLUSTER=ms-learning
 aws ecs list-tasks --cluster $CLUSTER --service-name order-service --desired-status STOPPED --query 'taskArns[0]' --output text \
   | xargs -I{} aws ecs describe-tasks --cluster $CLUSTER --tasks {} --query 'tasks[0].{reason:stoppedReason,exit:containers[0].exitCode}'
 ```
@@ -742,10 +752,10 @@ If they exist but the container still crashes, the task role — not your CLI id
 
 ```bash
 # Grab all outputs
-terraform -chdir=infrastructure/scenario-2 output
+terraform output
 
 # Watch ECS
-aws ecs describe-services --cluster ms-learning-cluster \
+aws ecs describe-services --cluster ms-learning \
   --services order-service payment-service user-service \
   --query 'services[].{name:serviceName,desired:desiredCount,running:runningCount}'
 

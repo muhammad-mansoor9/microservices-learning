@@ -57,19 +57,20 @@ resource "aws_ssm_parameter" "cognito_user_pool_id" {
   tags  = { Name = "cognito-user-pool-id" }
 }
 
-# Service Connect resolves these hostnames within the ECS cluster.
-# client_alias port=80 so no port needed in the URL.
+# Cloud Map resolves these FQDNs within the VPC's private DNS namespace.
+# Container port 8080 must be included since there's no Envoy sidecar rewriting
+# port 80 → 8080 (we don't use Service Connect — see ecs_cluster.tf comment).
 resource "aws_ssm_parameter" "payment_url" {
   name  = "/ms-learning/payment/url"
   type  = "String"
-  value = "http://payment-service"
+  value = "http://payment-service.ms-learning.local:8080"
   tags  = { Name = "payment-url" }
 }
 
 resource "aws_ssm_parameter" "user_url" {
   name  = "/ms-learning/user/url"
   type  = "String"
-  value = "http://user-service"
+  value = "http://user-service.ms-learning.local:8080"
   tags  = { Name = "user-url" }
 }
 

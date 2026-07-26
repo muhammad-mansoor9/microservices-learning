@@ -77,18 +77,10 @@ resource "aws_ecs_service" "order_service" {
     container_port   = 8080
   }
 
-  service_connect_configuration {
-    enabled   = true
-    namespace = aws_service_discovery_private_dns_namespace.ms_learning.arn
-
-    service {
-      port_name      = "http"
-      discovery_name = "order-service"
-      client_alias {
-        port     = 80
-        dns_name = "order-service"
-      }
-    }
+  # ECS registers each running task's ENI IP in Cloud Map so peers (and the
+  # SAGA Lambdas) can resolve `order-service.ms-learning.local`.
+  service_registries {
+    registry_arn = aws_service_discovery_service.services["order-service"].arn
   }
 
   depends_on = [aws_lb_listener.http, aws_lb_listener.http_test]
@@ -170,18 +162,8 @@ resource "aws_ecs_service" "payment_service" {
     container_port   = 8080
   }
 
-  service_connect_configuration {
-    enabled   = true
-    namespace = aws_service_discovery_private_dns_namespace.ms_learning.arn
-
-    service {
-      port_name      = "http"
-      discovery_name = "payment-service"
-      client_alias {
-        port     = 80
-        dns_name = "payment-service"
-      }
-    }
+  service_registries {
+    registry_arn = aws_service_discovery_service.services["payment-service"].arn
   }
 
   depends_on = [aws_lb_listener.payment_prod, aws_lb_listener.payment_test]
@@ -261,18 +243,8 @@ resource "aws_ecs_service" "user_service" {
     container_port   = 8080
   }
 
-  service_connect_configuration {
-    enabled   = true
-    namespace = aws_service_discovery_private_dns_namespace.ms_learning.arn
-
-    service {
-      port_name      = "http"
-      discovery_name = "user-service"
-      client_alias {
-        port     = 80
-        dns_name = "user-service"
-      }
-    }
+  service_registries {
+    registry_arn = aws_service_discovery_service.services["user-service"].arn
   }
 
   depends_on = [aws_lb_listener.user_prod, aws_lb_listener.user_test]

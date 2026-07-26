@@ -302,8 +302,10 @@ resource "aws_codebuild_project" "build" {
   }
 
   source {
-    type      = "CODEPIPELINE"
-    buildspec = file("${path.module}/../../buildspec.yml")
+    type = "CODEPIPELINE"
+    # buildspec.yml is read from the source artifact at run time.
+    # Do not inline it via file() — that bakes a snapshot into the
+    # CodeBuild project and requires terraform apply after every edit.
   }
 
   logs_config {

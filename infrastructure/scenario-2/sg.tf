@@ -60,7 +60,7 @@ resource "aws_security_group" "internal_alb" {
 
 resource "aws_security_group" "ecs_tasks" {
   name        = "${local.name_prefix}-ecs-tasks-sg"
-  description = "ECS tasks - ALB inbound and inter-service via Service Connect"
+  description = "ECS tasks — ALB inbound, inter-task traffic, and SAGA Lambda proxies"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -80,11 +80,23 @@ resource "aws_security_group" "ecs_tasks" {
   }
 
   ingress {
-    description = "Service Connect inter-service traffic"
+    description = "Service-to-service traffic between tasks"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     self        = true
+  }
+
+  # SAGA Lambda proxies reach ECS containers by Cloud Map DNS
+  # (<svc>.ms-learning.local:8080). Must be declared here — not as a
+  # separate aws_security_group_rule — because inline ingress is
+  # authoritative and would otherwise strip standalone rules on apply.
+  ingress {
+    description     = "SAGA Lambda proxies to ECS containers"
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = "tcp"
+    security_groups = [aws_security_group.saga_lambdas.id]
   }
 
   egress {

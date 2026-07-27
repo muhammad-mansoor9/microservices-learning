@@ -72,17 +72,10 @@ resource "aws_security_group" "saga_lambdas" {
   tags = { Name = "${local.name_prefix}-saga-lambdas-sg" }
 }
 
-# Allow SAGA Lambdas to reach ECS containers on the application port (8080).
-# Service Connect Envoy is not used here — Lambdas call discovered ENI IPs directly.
-resource "aws_security_group_rule" "ecs_tasks_from_saga_lambdas" {
-  type                     = "ingress"
-  from_port                = 8080
-  to_port                  = 8080
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.ecs_tasks.id
-  source_security_group_id = aws_security_group.saga_lambdas.id
-  description              = "SAGA Lambda proxies to ECS containers"
-}
+# Ingress from saga_lambdas to ecs_tasks is declared inline on the
+# ecs_tasks security group in sg.tf — a separate aws_security_group_rule
+# resource would be stripped on every apply because inline ingress is
+# authoritative.
 
 # ── Lambda Source Archives ────────────────────────────────────────────────────
 

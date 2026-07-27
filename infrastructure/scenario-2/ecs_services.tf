@@ -46,7 +46,8 @@ resource "aws_ecs_task_definition" "order_service" {
           "awslogs-stream-prefix" = "ecs"
         }
       }
-    }
+    },
+    local.xray_sidecar["order-service"],
   ])
 
   tags = { Name = "${local.name_prefix}-order-service" }
@@ -132,7 +133,8 @@ resource "aws_ecs_task_definition" "payment_service" {
           "awslogs-stream-prefix" = "ecs"
         }
       }
-    }
+    },
+    local.xray_sidecar["payment-service"],
   ])
 
   tags = { Name = "${local.name_prefix}-payment-service" }
@@ -213,7 +215,8 @@ resource "aws_ecs_task_definition" "user_service" {
           "awslogs-stream-prefix" = "ecs"
         }
       }
-    }
+    },
+    local.xray_sidecar["user-service"],
   ])
 
   tags = { Name = "${local.name_prefix}-user-service" }

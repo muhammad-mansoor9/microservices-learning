@@ -417,18 +417,25 @@ You should see at least one non-zero datapoint. CloudWatch can lag 60–90 secon
 
 The SAGA is only interesting if the compensations work. Two scenarios exercise them.
 
-### 10.1 User not found → OrderFailed (no compensation)
+### 10.1 User not found → HTTP 404 (SAGA never starts)
 
-Post an order for a user that isn't in DynamoDB. `order-service` validates synchronously and returns 4xx before starting the SAGA — but the SAGA also has a `Catch` on `ValidateUser` for the case where a Lambda error slips through. This exercises the pre-SAGA guard.
+`OrderCommandHandler.handle()` pre-validates the user with a synchronous call to user-service *before* it persists the order or starts Step Functions (see the `userServiceClient.findById(...) → orElseThrow(UserNotFoundException)` block). So an unknown user is rejected at the HTTP layer and no SAGA runs.
 
 ```bash
 curl -i -X POST "http://$ALB/api/orders" \
-  -H "Authorization: Bearer $ID_TOKEN" \
+  -H "Authorization: Bearer $JWT" \
   -H "Content-Type: application/json" \
   -d '{"userId":"00000000-0000-0000-0000-000000000000","amount":50.00}'
 ```
 
-Expect **HTTP 404** with a body containing `User not found`. No SFN execution is started (verify via the executions list — no new entry).
+Expect **HTTP 404** with a Problem+JSON body: `{"type":"about:blank","title":"User not found","status":404,"detail":"User not found: 00000000-…"}`.
+
+Verifications:
+- No new `orders` row in RDS (nothing to compensate).
+- No new Step Functions execution — check with `aws stepfunctions list-executions --state-machine-arn "$SFN_ARN" --max-results 5`.
+- No `OrdersCreated` metric tick (the `putMetricData` call happens *after* the pre-validation, so a rejected request never emits).
+
+The state machine still has a `Catch` on `ValidateUser` for the case where an unknown user *does* somehow reach the SAGA (e.g. a user deleted between the sync check and the async ValidateUser Lambda call). That branch routes to the `OrderFailed` state — but you won't hit it via the happy request path.
 
 ### 10.2 Payment fails → RefundPayment → CancelOrder → OrderFailed
 
@@ -515,6 +522,24 @@ Open **CloudWatch → Logs Insights**. In the *Queries* pane on the right you'll
 - `TraceSearch` — replace `TRACE_ID_HERE` in the query with an actual trace id (see next section) and run.
 
 ### 11.4 X-Ray service map
+
+X-Ray only works if two things are true:
+
+1. **Each ECS task runs an `amazon/aws-xray-daemon` sidecar container.** The AWS X-Ray SDK inside the Java apps sends segments to `127.0.0.1:2000` UDP by default. With `awsvpc` networking, all containers in a task share a network namespace, so the sidecar receives the app's segments locally and forwards them to the X-Ray API. Without the sidecar, segments are silently dropped and the service map stays empty. See `locals.tf` (`xray_sidecar`) and the second entry in each `container_definitions` in `ecs_services.tf`.
+2. **The task role has `xray:PutTraceSegments`, `xray:PutTelemetryRecords`, `xray:GetSamplingRules`, `xray:GetSamplingTargets`.** All three task roles carry this via the `XRayWrite` statement in `iam.tf`.
+
+If the service map is empty, first check the sidecar is actually in the running task:
+
+```bash
+aws ecs describe-tasks --cluster ms-learning \
+  --tasks $(aws ecs list-tasks --cluster ms-learning --service-name order-service \
+              --query 'taskArns[0]' --output text) \
+  --query 'tasks[0].containers[].{name:name,status:lastStatus,image:image}' --output table
+```
+
+You want to see **two rows**: `order-service` and `xray-daemon`, both `RUNNING`.
+
+Then open the service map:
 
 ```bash
 open "https://us-east-1.console.aws.amazon.com/xray/home?region=us-east-1#/service-map"

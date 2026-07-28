@@ -145,3 +145,52 @@ resource "helm_release" "istiod" {
 #
 #   depends_on = [helm_release.istiod]
 # }
+
+# -----------------------------------------------------------------------------
+# kube-prometheus-stack — Prometheus operator, Alertmanager, Grafana, and
+# the node-exporter/kube-state-metrics scrape targets. Grafana persistence
+# is off to keep the footprint small on the t3.medium nodes.
+# -----------------------------------------------------------------------------
+resource "kubernetes_namespace" "monitoring" {
+  metadata {
+    name = "monitoring"
+    labels = {
+      "app.kubernetes.io/managed-by" = "terraform"
+    }
+  }
+
+  depends_on = [module.eks]
+}
+
+resource "helm_release" "kube_prometheus_stack" {
+  name       = "kube-prometheus-stack"
+  namespace  = kubernetes_namespace.monitoring.metadata[0].name
+  repository = "https://prometheus-community.github.io/helm-charts"
+  chart      = "kube-prometheus-stack"
+  version    = var.kube_prometheus_stack_chart_version
+  timeout    = 900
+  atomic     = true
+
+  set {
+    name  = "grafana.enabled"
+    value = "true"
+  }
+
+  set {
+    name  = "grafana.persistence.enabled"
+    value = "false"
+  }
+
+  # Discover PodMonitor / ServiceMonitor resources across all namespaces
+  # regardless of Helm-injected label selectors, so services don't need
+  # to know which release name Prometheus was installed under.
+  set {
+    name  = "prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues"
+    value = "false"
+  }
+
+  set {
+    name  = "prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues"
+    value = "false"
+  }
+}

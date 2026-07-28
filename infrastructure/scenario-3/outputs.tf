@@ -54,6 +54,11 @@ output "user_service_role_arn" {
   value       = module.user_service_irsa.iam_role_arn
 }
 
+output "fluentbit_role_arn" {
+  description = "IRSA role ARN for amazon-cloudwatch/fluentbit"
+  value       = module.fluentbit_irsa.iam_role_arn
+}
+
 output "vpc_id" {
   description = "VPC ID"
   value       = module.vpc.vpc_id

@@ -164,3 +164,44 @@ resource "aws_iam_role_policy" "user_service" {
     ]
   })
 }
+
+# -----------------------------------------------------------------------------
+# FluentBit IRSA — trusts amazon-cloudwatch/fluentbit SA.
+# CloudWatch Logs write scope so the DaemonSet can ship container logs to the
+# /eks/ms-learning log group.
+# -----------------------------------------------------------------------------
+module "fluentbit_irsa" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.44"
+
+  role_name = "${var.cluster_name}-fluentbit"
+
+  oidc_providers = {
+    main = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["amazon-cloudwatch:fluentbit"]
+    }
+  }
+}
+
+resource "aws_iam_role_policy" "fluentbit" {
+  name = "fluentbit-inline"
+  role = module.fluentbit_irsa.iam_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "CloudWatchLogsWrite"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogStreams",
+        ]
+        Resource = "*"
+      },
+    ]
+  })
+}

@@ -15,6 +15,10 @@ spec:
     metadata:
       labels:
         {{- include "order-service.selectorLabels" . | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.service.port | quote }}
+        prometheus.io/path: "/actuator/prometheus"
     spec:
       serviceAccountName: {{ include "order-service.serviceAccountName" . }}
       volumes:

@@ -67,5 +67,19 @@ kubectl apply -f "${REPO_ROOT}/argocd/order-service-app.yaml"
 kubectl apply -f "${REPO_ROOT}/argocd/payment-service-app.yaml"
 kubectl apply -f "${REPO_ROOT}/argocd/user-service-app.yaml"
 
+log "Applying FluentBit stack (log shipping to CloudWatch)"
+FLUENTBIT_ROLE_ARN="$(terraform -chdir="${REPO_ROOT}/infrastructure/scenario-3" output -raw fluentbit_role_arn 2>/dev/null || true)"
+if [[ -z "${FLUENTBIT_ROLE_ARN}" ]]; then
+  echo "  warning: could not read fluentbit_role_arn from Terraform output — skipping FluentBit apply."
+  echo "           run \`terraform apply\` in infrastructure/scenario-3 first, then re-run this script."
+else
+  kubectl apply -f "${REPO_ROOT}/k8s/fluentbit/namespace.yaml"
+  # Substitute the placeholder role ARN in a temp file so the source stays repo-clean.
+  sed "s|FLUENTBIT_ROLE_ARN|${FLUENTBIT_ROLE_ARN}|" "${REPO_ROOT}/k8s/fluentbit/serviceaccount.yaml" \
+    | kubectl apply -f -
+  kubectl apply -f "${REPO_ROOT}/k8s/fluentbit/configmap.yaml"
+  kubectl apply -f "${REPO_ROOT}/k8s/fluentbit/daemonset.yaml"
+fi
+
 echo
 echo "Cluster setup complete — ArgoCD will now sync deployments"

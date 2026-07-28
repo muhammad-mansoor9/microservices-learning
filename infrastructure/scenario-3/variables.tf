@@ -93,3 +93,9 @@ variable "istio_chart_version" {
   type        = string
   default     = "1.23.0"
 }
+
+variable "kube_prometheus_stack_chart_version" {
+  description = "Helm chart version for kube-prometheus-stack"
+  type        = string
+  default     = "62.7.0"
+}

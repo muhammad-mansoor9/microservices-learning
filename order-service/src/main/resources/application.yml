@@ -1,15 +1,41 @@
 spring:
   application:
     name: order-service
-  profiles:
-    active: local
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/order_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:10}
+      minimum-idle: ${DB_POOL_MIN:2}
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: ${JPA_DDL_AUTO:update}
     show-sql: false
+
+server:
+  port: ${SERVER_PORT:8080}
+
+services:
+  user-service-url: ${USER_SERVICE_URL:http://user-service:8080}
+  payment-service-url: ${PAYMENT_SERVICE_URL:http://payment-service:8080}
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+      group:
+        readiness:
+          include: readinessState,db
+        liveness:
+          include: livenessState

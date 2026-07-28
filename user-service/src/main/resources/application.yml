@@ -1,5 +1,28 @@
 spring:
   application:
     name: user-service
-  profiles:
-    active: local
+
+server:
+  port: ${SERVER_PORT:8080}
+
+aws:
+  region: ${AWS_REGION:us-east-1}
+  dynamodb:
+    table-name: ${USERS_TABLE:users}
+    endpoint: ${DYNAMODB_ENDPOINT:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+      group:
+        readiness:
+          include: readinessState
+        liveness:
+          include: livenessState

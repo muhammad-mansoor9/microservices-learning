@@ -77,16 +77,18 @@ services:
       dockerfile: user-service/Dockerfile
     container_name: user-service
     ports:
-      - "8083:8083"
+      - "8083:8080"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
+      - AWS_REGION=us-east-1
+      - DYNAMODB_ENDPOINT=http://localstack:4566
+      - USERS_TABLE=users
     depends_on:
       localstack:
         condition: service_healthy
     networks:
       - ms-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -98,17 +100,18 @@ services:
       dockerfile: payment-service/Dockerfile
     container_name: payment-service
     ports:
-      - "8082:8082"
+      - "8082:8080"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - POSTGRES_PASSWORD=postgres
+      - DB_URL=jdbc:postgresql://postgres:5432/payment_db
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=postgres
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - ms-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/actuator/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -122,8 +125,11 @@ services:
     ports:
       - "8081:8080"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - POSTGRES_PASSWORD=postgres
+      - DB_URL=jdbc:postgresql://postgres:5432/order_db
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=postgres
+      - USER_SERVICE_URL=http://user-service:8080
+      - PAYMENT_SERVICE_URL=http://payment-service:8080
     depends_on:
       postgres:
         condition: service_healthy

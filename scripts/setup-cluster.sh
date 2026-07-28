@@ -46,11 +46,14 @@ helm upgrade --install istiod istio/istiod \
   --version "${ISTIO_VERSION}" \
   --wait
 
-log "Installing/upgrading istio-ingress ${ISTIO_VERSION} (ClusterIP)"
-helm upgrade --install istio-ingress istio/gateway \
-  --namespace istio-system \
-  --version "${ISTIO_VERSION}" \
-  --set service.type=ClusterIP
+# Istio ingress gateway install intentionally skipped — AWS LB Controller
+# handles external traffic. Uncomment to enable once the gateway pod's
+# readiness stall is understood.
+# log "Installing/upgrading istio-ingress ${ISTIO_VERSION} (ClusterIP)"
+# helm upgrade --install istio-ingress istio/gateway \
+#   --namespace istio-system \
+#   --version "${ISTIO_VERSION}" \
+#   --set service.type=ClusterIP
 
 log "Labelling default namespace for sidecar injection"
 kubectl apply -f "${REPO_ROOT}/k8s/namespace.yaml"

@@ -121,19 +121,27 @@ resource "helm_release" "istiod" {
   depends_on = [helm_release.istio_base]
 }
 
-resource "helm_release" "istio_ingress" {
-  name       = "istio-ingress"
-  namespace  = kubernetes_namespace.istio_system.metadata[0].name
-  repository = "https://istio-release.storage.googleapis.com/charts"
-  chart      = "gateway"
-  version    = var.istio_chart_version
-  timeout    = 900
-  atomic     = true
-
-  set {
-    name  = "service.type"
-    value = "ClusterIP"
-  }
-
-  depends_on = [helm_release.istiod]
-}
+# Istio ingress gateway intentionally not installed via Terraform.
+# External north-south traffic is handled by the AWS Load Balancer
+# Controller (ALB Ingress), so the gateway is optional here. The chart
+# was consistently hanging past the 15 min Helm timeout on this cluster
+# — bring it back once we've isolated why the gateway pod stalls on
+# readiness. To re-enable, uncomment this block and (optionally) the
+# matching helm install in scripts/setup-cluster.sh.
+#
+# resource "helm_release" "istio_ingress" {
+#   name       = "istio-ingress"
+#   namespace  = kubernetes_namespace.istio_system.metadata[0].name
+#   repository = "https://istio-release.storage.googleapis.com/charts"
+#   chart      = "gateway"
+#   version    = var.istio_chart_version
+#   timeout    = 900
+#   atomic     = true
+#
+#   set {
+#     name  = "service.type"
+#     value = "ClusterIP"
+#   }
+#
+#   depends_on = [helm_release.istiod]
+# }

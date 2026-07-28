@@ -4,6 +4,8 @@ resource "helm_release" "aws_lb_controller" {
   repository = "https://aws.github.io/eks-charts"
   chart      = "aws-load-balancer-controller"
   version    = var.aws_load_balancer_controller_chart_version
+  timeout    = 900
+  atomic     = true
 
   set {
     name  = "clusterName"
@@ -55,6 +57,8 @@ resource "helm_release" "argocd" {
   repository = "https://argoproj.github.io/argo-helm"
   chart      = "argo-cd"
   version    = var.argocd_chart_version
+  timeout    = 900
+  atomic     = true
 }
 
 resource "kubernetes_namespace" "keda" {
@@ -74,4 +78,62 @@ resource "helm_release" "keda" {
   repository = "https://kedacore.github.io/charts"
   chart      = "keda"
   version    = var.keda_chart_version
+  timeout    = 900
+  atomic     = true
+}
+
+# -----------------------------------------------------------------------------
+# Istio service mesh — provides mTLS between pods. External north-south traffic
+# still enters through the AWS Load Balancer Controller (ALB Ingress), so the
+# Istio ingress gateway Service is ClusterIP-only to avoid an unused NLB.
+# -----------------------------------------------------------------------------
+resource "kubernetes_namespace" "istio_system" {
+  metadata {
+    name = "istio-system"
+    labels = {
+      "app.kubernetes.io/managed-by" = "terraform"
+    }
+  }
+
+  depends_on = [module.eks]
+}
+
+resource "helm_release" "istio_base" {
+  name       = "istio-base"
+  namespace  = kubernetes_namespace.istio_system.metadata[0].name
+  repository = "https://istio-release.storage.googleapis.com/charts"
+  chart      = "base"
+  version    = var.istio_chart_version
+  timeout    = 900
+  atomic     = true
+}
+
+resource "helm_release" "istiod" {
+  name       = "istiod"
+  namespace  = kubernetes_namespace.istio_system.metadata[0].name
+  repository = "https://istio-release.storage.googleapis.com/charts"
+  chart      = "istiod"
+  version    = var.istio_chart_version
+  wait       = true
+  timeout    = 900
+  atomic     = true
+
+  depends_on = [helm_release.istio_base]
+}
+
+resource "helm_release" "istio_ingress" {
+  name       = "istio-ingress"
+  namespace  = kubernetes_namespace.istio_system.metadata[0].name
+  repository = "https://istio-release.storage.googleapis.com/charts"
+  chart      = "gateway"
+  version    = var.istio_chart_version
+  timeout    = 900
+  atomic     = true
+
+  set {
+    name  = "service.type"
+    value = "ClusterIP"
+  }
+
+  depends_on = [helm_release.istiod]
 }

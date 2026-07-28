@@ -87,3 +87,9 @@ variable "keda_chart_version" {
   type        = string
   default     = "2.15.1"
 }
+
+variable "istio_chart_version" {
+  description = "Helm chart version for Istio (base, istiod, gateway)"
+  type        = string
+  default     = "1.23.0"
+}

@@ -1,0 +1,88 @@
+terraform {
+  required_version = ">= 1.6.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.30"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.13"
+    }
+  }
+
+  backend "s3" {
+    bucket         = "microservices-learning-terraform-state-dev"
+    key            = "scenario3/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "microservices-learning-terraform-locks-dev"
+    encrypt        = true
+  }
+}
+
+provider "aws" {
+  region = var.aws_region
+
+  default_tags {
+    tags = local.common_tags
+  }
+}
+
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
+provider "kubernetes" {
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args = [
+      "eks",
+      "get-token",
+      "--cluster-name",
+      module.eks.cluster_name,
+      "--region",
+      var.aws_region,
+    ]
+  }
+}
+
+provider "helm" {
+  kubernetes {
+    host                   = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args = [
+        "eks",
+        "get-token",
+        "--cluster-name",
+        module.eks.cluster_name,
+        "--region",
+        var.aws_region,
+      ]
+    }
+  }
+}
+
+locals {
+  common_tags = {
+    Project  = "ms-learning"
+    Scenario = "eks"
+  }
+
+  account_id             = data.aws_caller_identity.current.account_id
+  region                 = data.aws_region.current.name
+  order_events_queue_arn = "arn:aws:sqs:${local.region}:${local.account_id}:order-events"
+  users_table_arn        = "arn:aws:dynamodb:${local.region}:${local.account_id}:table/${var.users_table_name}"
+  ssm_parameter_arn      = "arn:aws:ssm:${local.region}:${local.account_id}:parameter/ms-learning/*"
+}

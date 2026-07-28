@@ -99,3 +99,22 @@ variable "kube_prometheus_stack_chart_version" {
   type        = string
   default     = "62.7.0"
 }
+
+variable "postgres_chart_version" {
+  description = "Helm chart version for Bitnami postgresql (in-cluster DB for order+payment)"
+  type        = string
+  default     = "15.5.20"
+}
+
+variable "postgres_admin_password" {
+  description = "Password for the postgres user in the in-cluster DB (learning env only)"
+  type        = string
+  default     = "postgres"
+  sensitive   = true
+}
+
+variable "fluentbit_chart_version" {
+  description = "Helm chart version for aws-for-fluent-bit"
+  type        = string
+  default     = "0.1.34"
+}

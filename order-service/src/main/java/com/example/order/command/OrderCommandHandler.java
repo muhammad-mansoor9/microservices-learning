@@ -58,9 +58,7 @@ public class OrderCommandHandler {
             orderRepository.save(order);
         });
 
-        // SAGA start signal for KEDA — publish AFTER commit so a rolled-back
-        // tx never emits a phantom event. Fire-and-forget; SQS failures are
-        // logged, not surfaced to the caller.
+        // Publish after commit so a rolled-back tx cannot emit a phantom event.
         orderEventPublisher.publishOrderCreated(createdEvent);
 
         // Phase 3: call payment — no DB connection held

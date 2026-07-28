@@ -3,7 +3,7 @@ name: EKS deploy
 on:
   push:
     branches:
-      - scenario-3-eks
+      - scenario-3
 
 concurrency:
   group: eks-deploy
@@ -59,9 +59,11 @@ jobs:
           docker build -f order-service/Dockerfile \
             -t "${IMAGE}:${IMAGE_TAG_FULL}" \
             -t "${IMAGE}:${IMAGE_TAG_SHORT}" \
+            -t "${IMAGE}:latest" \
             .
           docker push "${IMAGE}:${IMAGE_TAG_FULL}"
           docker push "${IMAGE}:${IMAGE_TAG_SHORT}"
+          docker push "${IMAGE}:latest"
 
       - name: Build payment-service
         run: mvn -B --no-transfer-progress -pl payment-service -am -DskipTests package
@@ -76,9 +78,11 @@ jobs:
           docker build -f payment-service/Dockerfile \
             -t "${IMAGE}:${IMAGE_TAG_FULL}" \
             -t "${IMAGE}:${IMAGE_TAG_SHORT}" \
+            -t "${IMAGE}:latest" \
             .
           docker push "${IMAGE}:${IMAGE_TAG_FULL}"
           docker push "${IMAGE}:${IMAGE_TAG_SHORT}"
+          docker push "${IMAGE}:latest"
 
       - name: Build user-service
         run: mvn -B --no-transfer-progress -pl user-service -am -DskipTests package
@@ -93,9 +97,11 @@ jobs:
           docker build -f user-service/Dockerfile \
             -t "${IMAGE}:${IMAGE_TAG_FULL}" \
             -t "${IMAGE}:${IMAGE_TAG_SHORT}" \
+            -t "${IMAGE}:latest" \
             .
           docker push "${IMAGE}:${IMAGE_TAG_FULL}"
           docker push "${IMAGE}:${IMAGE_TAG_SHORT}"
+          docker push "${IMAGE}:latest"
 
   update-helm-values:
     name: Update Helm values with new image tag

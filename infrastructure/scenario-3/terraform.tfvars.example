@@ -19,3 +19,6 @@ argocd_chart_version                       = "7.6.10"
 keda_chart_version                         = "2.15.1"
 istio_chart_version                        = "1.23.0"
 kube_prometheus_stack_chart_version        = "62.7.0"
+postgres_chart_version                     = "15.5.20"
+# postgres_admin_password left at default; set via TF_VAR_postgres_admin_password for real deployments.
+fluentbit_chart_version                    = "0.1.34"

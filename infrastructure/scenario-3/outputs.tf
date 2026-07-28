@@ -84,6 +84,16 @@ output "order_events_queue_url" {
   value       = aws_sqs_queue.order_events.url
 }
 
+output "ecr_registry" {
+  description = "ECR registry hostname (<account>.dkr.ecr.<region>.amazonaws.com)"
+  value       = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
+}
+
+output "ecr_repository_urls" {
+  description = "Per-service ECR repository URLs"
+  value       = { for k, r in aws_ecr_repository.service : k => r.repository_url }
+}
+
 output "order_events_queue_arn" {
   description = "SQS queue ARN referenced by order/payment IRSA policies"
   value       = aws_sqs_queue.order_events.arn

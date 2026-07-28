@@ -50,10 +50,9 @@ aws:
   region: us-east-1
 
 # payment-service only — full SQS URL from Terraform output
-# (`terraform output -raw order_events_queue_url`). ACCOUNT_ID placeholder
-# below must be replaced with your AWS account ID.
+# (`terraform output -raw order_events_queue_url`).
 sqs:
-  queueUrl: "https://sqs.us-east-1.amazonaws.com/ACCOUNT_ID/order-events"
+  queueUrl: "https://sqs.us-east-1.amazonaws.com/311902596266/order-events"
 
 # order-service only — ignored by other charts
 ingress:

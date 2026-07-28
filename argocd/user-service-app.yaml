@@ -6,12 +6,21 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: YOUR_REPO_URL
-    targetRevision: scenario-3-eks
+    repoURL: https://github.com/muhammad-mansoor9/microservices-learning.git
+    targetRevision: scenario-3
     path: helm/user-service
     helm:
       valueFiles:
         - ../../helm/values-prod.yaml
+      valuesObject:
+        image:
+          repository: 311902596266.dkr.ecr.us-east-1.amazonaws.com/ms-learning/user-service
+        irsa:
+          roleArn: arn:aws:iam::311902596266:role/ms-learning-eks-user-service
+        env:
+          AWS_REGION: us-east-1
+          USERS_TABLE: users
+          # DYNAMODB_ENDPOINT left unset -> real AWS DynamoDB via IRSA
   destination:
     server: https://kubernetes.default.svc
     namespace: default

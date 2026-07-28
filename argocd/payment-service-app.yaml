@@ -6,12 +6,21 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: YOUR_REPO_URL
-    targetRevision: scenario-3-eks
+    repoURL: https://github.com/muhammad-mansoor9/microservices-learning.git
+    targetRevision: scenario-3
     path: helm/payment-service
     helm:
       valueFiles:
         - ../../helm/values-prod.yaml
+      valuesObject:
+        image:
+          repository: 311902596266.dkr.ecr.us-east-1.amazonaws.com/ms-learning/payment-service
+        irsa:
+          roleArn: arn:aws:iam::311902596266:role/ms-learning-eks-payment-service
+        env:
+          DB_URL: jdbc:postgresql://postgres.default.svc.cluster.local:5432/payment_db
+          DB_USERNAME: postgres
+          DB_PASSWORD: postgres
   destination:
     server: https://kubernetes.default.svc
     namespace: default

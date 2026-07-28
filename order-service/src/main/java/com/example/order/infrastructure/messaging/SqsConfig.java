@@ -18,8 +18,6 @@ public class SqsConfig {
     @Value("${aws.region:us-east-1}")
     private String awsRegion;
 
-    // Empty = real AWS (credentials via IRSA / default chain).
-    // Set to http://localstack:4566 (docker-compose) or http://localhost:4566 (host) for local dev.
     @Value("${sqs.endpoint:}")
     private String sqsEndpoint;
 

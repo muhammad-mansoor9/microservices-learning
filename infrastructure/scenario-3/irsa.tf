@@ -1,8 +1,3 @@
-# -----------------------------------------------------------------------------
-# EBS CSI driver — IRSA for kube-system/ebs-csi-controller-sa.
-# The aws-ebs-csi-driver addon cannot reach ACTIVE state without a role that
-# lets the controller call the EC2 API (CreateVolume, AttachVolume, ...).
-# -----------------------------------------------------------------------------
 module "ebs_csi_irsa" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
   version = "~> 5.44"
@@ -19,10 +14,6 @@ module "ebs_csi_irsa" {
   }
 }
 
-# -----------------------------------------------------------------------------
-# AWS Load Balancer Controller — IRSA for kube-system/aws-load-balancer-controller
-# Uses the sub-module's built-in policy (rendered from the official upstream JSON).
-# -----------------------------------------------------------------------------
 module "aws_lb_controller_irsa" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
   version = "~> 5.44"
@@ -39,10 +30,6 @@ module "aws_lb_controller_irsa" {
   }
 }
 
-# -----------------------------------------------------------------------------
-# order-service IRSA — trusts default/order-service SA.
-# SQS: Receive/Send/Delete on order-events queue. SSM: GetParameter on /ms-learning/*.
-# -----------------------------------------------------------------------------
 module "order_service_irsa" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
   version = "~> 5.44"
@@ -86,10 +73,6 @@ resource "aws_iam_role_policy" "order_service" {
   })
 }
 
-# -----------------------------------------------------------------------------
-# payment-service IRSA — trusts default/payment-service SA.
-# SQS consumer on order-events queue.
-# -----------------------------------------------------------------------------
 module "payment_service_irsa" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
   version = "~> 5.44"
@@ -126,10 +109,6 @@ resource "aws_iam_role_policy" "payment_service" {
   })
 }
 
-# -----------------------------------------------------------------------------
-# user-service IRSA — trusts default/user-service SA.
-# DynamoDB: PutItem/GetItem/Query on users table.
-# -----------------------------------------------------------------------------
 module "user_service_irsa" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
   version = "~> 5.44"
@@ -165,11 +144,6 @@ resource "aws_iam_role_policy" "user_service" {
   })
 }
 
-# -----------------------------------------------------------------------------
-# FluentBit IRSA — trusts amazon-cloudwatch/fluentbit SA.
-# CloudWatch Logs write scope so the DaemonSet can ship container logs to the
-# /eks/ms-learning log group.
-# -----------------------------------------------------------------------------
 module "fluentbit_irsa" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
   version = "~> 5.44"

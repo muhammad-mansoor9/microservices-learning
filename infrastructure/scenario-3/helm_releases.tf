@@ -82,11 +82,6 @@ resource "helm_release" "keda" {
   atomic     = true
 }
 
-# -----------------------------------------------------------------------------
-# Istio service mesh — provides mTLS between pods. External north-south traffic
-# still enters through the AWS Load Balancer Controller (ALB Ingress), so the
-# Istio ingress gateway Service is ClusterIP-only to avoid an unused NLB.
-# -----------------------------------------------------------------------------
 resource "kubernetes_namespace" "istio_system" {
   metadata {
     name = "istio-system"
@@ -121,36 +116,6 @@ resource "helm_release" "istiod" {
   depends_on = [helm_release.istio_base]
 }
 
-# Istio ingress gateway intentionally not installed via Terraform.
-# External north-south traffic is handled by the AWS Load Balancer
-# Controller (ALB Ingress), so the gateway is optional here. The chart
-# was consistently hanging past the 15 min Helm timeout on this cluster
-# — bring it back once we've isolated why the gateway pod stalls on
-# readiness. To re-enable, uncomment this block and (optionally) the
-# matching helm install in scripts/setup-cluster.sh.
-#
-# resource "helm_release" "istio_ingress" {
-#   name       = "istio-ingress"
-#   namespace  = kubernetes_namespace.istio_system.metadata[0].name
-#   repository = "https://istio-release.storage.googleapis.com/charts"
-#   chart      = "gateway"
-#   version    = var.istio_chart_version
-#   timeout    = 900
-#   atomic     = true
-#
-#   set {
-#     name  = "service.type"
-#     value = "ClusterIP"
-#   }
-#
-#   depends_on = [helm_release.istiod]
-# }
-
-# -----------------------------------------------------------------------------
-# kube-prometheus-stack — Prometheus operator, Alertmanager, Grafana, and
-# the node-exporter/kube-state-metrics scrape targets. Grafana persistence
-# is off to keep the footprint small on the t3.medium nodes.
-# -----------------------------------------------------------------------------
 resource "kubernetes_namespace" "monitoring" {
   metadata {
     name = "monitoring"
@@ -181,9 +146,6 @@ resource "helm_release" "kube_prometheus_stack" {
     value = "false"
   }
 
-  # Discover PodMonitor / ServiceMonitor resources across all namespaces
-  # regardless of Helm-injected label selectors, so services don't need
-  # to know which release name Prometheus was installed under.
   set {
     name  = "prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues"
     value = "false"
@@ -193,4 +155,48 @@ resource "helm_release" "kube_prometheus_stack" {
     name  = "prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues"
     value = "false"
   }
+}
+
+resource "helm_release" "postgres" {
+  name       = "postgres"
+  namespace  = "default"
+  repository = "https://charts.bitnami.com/bitnami"
+  chart      = "postgresql"
+  version    = var.postgres_chart_version
+  timeout    = 900
+  atomic     = true
+
+  values = [
+    yamlencode({
+      fullnameOverride = "postgres"
+      auth = {
+        postgresPassword = var.postgres_admin_password
+        database         = "postgres"
+      }
+      primary = {
+        # Postgres speaks a binary wire protocol; the Envoy sidecar can garble it.
+        podAnnotations = {
+          "sidecar.istio.io/inject" = "false"
+        }
+        initdb = {
+          scripts = {
+            "00-init-databases.sql" = "CREATE DATABASE order_db;\nCREATE DATABASE payment_db;\n"
+          }
+        }
+        persistence = {
+          enabled = true
+          size    = "8Gi"
+        }
+        resources = {
+          requests = { cpu = "100m", memory = "256Mi" }
+          limits   = { cpu = "500m", memory = "512Mi" }
+        }
+      }
+      metrics = {
+        enabled = false
+      }
+    })
+  ]
+
+  depends_on = [module.eks]
 }

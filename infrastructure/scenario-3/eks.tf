@@ -9,12 +9,8 @@ module "eks" {
   subnet_ids               = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.private_subnets
 
-  cluster_endpoint_public_access = true
-
-  # IRSA — creates the OIDC provider used by all IRSA roles.
-  enable_irsa = true
-
-  # Give the identity running `terraform apply` cluster-admin.
+  cluster_endpoint_public_access           = true
+  enable_irsa                              = true
   enable_cluster_creator_admin_permissions = true
 
   cluster_addons = {

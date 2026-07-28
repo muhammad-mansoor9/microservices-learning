@@ -1,0 +1,47 @@
+# Shared prod overrides. Apply per service with:
+#   helm upgrade --install order-service   ./helm/order-service   -f ./helm/values-prod.yaml \
+#     --set image.repository=<ecr>/order-service --set image.tag=<sha> --set irsa.roleArn=<order-irsa-arn> \
+#     --set ingress.enabled=true --set ingress.host=orders.example.com \
+#     --set ingress.cognito.userPoolArn=<arn> --set ingress.cognito.userPoolClientId=<id> --set ingress.cognito.userPoolDomain=<domain>
+#   helm upgrade --install payment-service ./helm/payment-service -f ./helm/values-prod.yaml \
+#     --set image.repository=<ecr>/payment-service --set image.tag=<sha> --set irsa.roleArn=<payment-irsa-arn>
+#   helm upgrade --install user-service    ./helm/user-service    -f ./helm/values-prod.yaml \
+#     --set image.repository=<ecr>/user-service --set image.tag=<sha> --set irsa.roleArn=<user-irsa-arn>
+
+image:
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+resources:
+  requests:
+    cpu: 256m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+env:
+  SPRING_PROFILES_ACTIVE: prod
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.observability.svc.cluster.local:4318
+  OTEL_TRACES_EXPORTER: otlp
+  OTEL_METRICS_EXPORTER: otlp
+  OTEL_LOGS_EXPORTER: otlp
+
+irsa:
+  roleArn: ""
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+# order-service only — ignored by other charts
+ingress:
+  enabled: false
+  host: ""
+  cognito:
+    userPoolArn: ""
+    userPoolClientId: ""
+    userPoolDomain: ""

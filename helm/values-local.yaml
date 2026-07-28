@@ -1,0 +1,34 @@
+# Shared local-dev overrides. Apply per service with:
+#   helm upgrade --install order-service   ./helm/order-service   -f ./helm/values-local.yaml --set image.repository=order-service
+#   helm upgrade --install payment-service ./helm/payment-service -f ./helm/values-local.yaml --set image.repository=payment-service
+#   helm upgrade --install user-service    ./helm/user-service    -f ./helm/values-local.yaml --set image.repository=user-service
+
+image:
+  tag: local
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: 128m
+    memory: 256Mi
+  limits:
+    cpu: 300m
+    memory: 512Mi
+
+env:
+  SPRING_PROFILES_ACTIVE: local
+  OTEL_TRACES_EXPORTER: none
+  OTEL_METRICS_EXPORTER: none
+  OTEL_LOGS_EXPORTER: none
+
+irsa:
+  roleArn: ""
+
+autoscaling:
+  enabled: false
+
+# order-service only — ignored by other charts
+ingress:
+  enabled: false

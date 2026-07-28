@@ -1,0 +1,40 @@
+image:
+  repository: ""
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: 256m
+    memory: 512Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi
+
+env: {}
+
+irsa:
+  roleArn: ""
+
+service:
+  port: 8080
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+
+otel:
+  agentVersion: "2.10.0"
+  agentUrl: ""
+
+ingress:
+  enabled: false
+  host: ""
+  cognito:
+    userPoolArn: ""
+    userPoolClientId: ""
+    userPoolDomain: ""

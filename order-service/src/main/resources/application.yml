@@ -24,6 +24,13 @@ services:
   user-service-url: ${USER_SERVICE_URL:http://user-service:8080}
   payment-service-url: ${PAYMENT_SERVICE_URL:http://payment-service:8080}
 
+aws:
+  region: ${AWS_REGION:us-east-1}
+
+sqs:
+  endpoint: ${SQS_ENDPOINT:}
+  order-events-queue-url: ${SQS_ORDER_EVENTS_QUEUE_URL:}
+
 management:
   endpoints:
     web:

@@ -130,12 +130,17 @@ services:
       - DB_PASSWORD=postgres
       - USER_SERVICE_URL=http://user-service:8080
       - PAYMENT_SERVICE_URL=http://payment-service:8080
+      - AWS_REGION=us-east-1
+      - SQS_ENDPOINT=http://localstack:4566
+      - SQS_ORDER_EVENTS_QUEUE_URL=http://localstack:4566/000000000000/order-events
     depends_on:
       postgres:
         condition: service_healthy
       payment-service:
         condition: service_healthy
       user-service:
+        condition: service_healthy
+      localstack:
         condition: service_healthy
     networks:
       - ms-network

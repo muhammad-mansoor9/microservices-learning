@@ -27,6 +27,19 @@ autoscaling:
   maxReplicas: 3
   targetCPUUtilizationPercentage: 70
 
+  keda:
+    enabled: false
+    minReplicaCount: 0
+    maxReplicaCount: 5
+    cooldownPeriod: 30
+    queueLength: 5
+
 otel:
   agentVersion: "2.10.0"
   agentUrl: ""
+
+sqs:
+  queueUrl: ""
+
+aws:
+  region: us-east-1

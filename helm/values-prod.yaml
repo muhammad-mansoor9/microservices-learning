@@ -37,6 +37,24 @@ autoscaling:
   maxReplicas: 6
   targetCPUUtilizationPercentage: 70
 
+  # payment-service only — KEDA SQS scaler. minReplicaCount=0 means the
+  # deployment scales to zero when the order-events queue is empty.
+  keda:
+    enabled: true
+    minReplicaCount: 0
+    maxReplicaCount: 5
+    cooldownPeriod: 30
+    queueLength: 5
+
+aws:
+  region: us-east-1
+
+# payment-service only — full SQS URL from Terraform output
+# (`terraform output -raw order_events_queue_url`). ACCOUNT_ID placeholder
+# below must be replaced with your AWS account ID.
+sqs:
+  queueUrl: "https://sqs.us-east-1.amazonaws.com/ACCOUNT_ID/order-events"
+
 # order-service only — ignored by other charts
 ingress:
   enabled: false

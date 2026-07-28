@@ -73,3 +73,13 @@ output "kubeconfig_command" {
   description = "Command to update your local kubeconfig for kubectl access"
   value       = "aws eks update-kubeconfig --region ${var.aws_region} --name ${module.eks.cluster_name}"
 }
+
+output "order_events_queue_url" {
+  description = "SQS queue URL consumed by payment-service and used by KEDA"
+  value       = aws_sqs_queue.order_events.url
+}
+
+output "order_events_queue_arn" {
+  description = "SQS queue ARN referenced by order/payment IRSA policies"
+  value       = aws_sqs_queue.order_events.arn
+}

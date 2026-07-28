@@ -10,6 +10,7 @@ import com.example.order.infrastructure.client.dto.PaymentRequest;
 import com.example.order.infrastructure.client.dto.PaymentResponse;
 import com.example.order.infrastructure.client.exception.PaymentServiceException;
 import com.example.order.infrastructure.client.exception.UserNotFoundException;
+import com.example.order.infrastructure.messaging.OrderEventPublisher;
 import com.example.order.model.OrderEvent;
 import com.example.order.model.OrderEventRepository;
 import com.example.order.readmodel.Order;
@@ -34,6 +35,7 @@ public class OrderCommandHandler {
     private final UserServiceClient userServiceClient;
     private final PaymentServiceClient paymentServiceClient;
     private final TransactionTemplate transactionTemplate;
+    private final OrderEventPublisher orderEventPublisher;
 
     public UUID handle(CreateOrderCommand command) {
         // Phase 1: validate user — no DB connection held
@@ -42,11 +44,11 @@ public class OrderCommandHandler {
 
         UUID orderId = UUID.randomUUID();
         Instant now = Instant.now();
+        OrderCreatedEvent createdEvent = new OrderCreatedEvent(orderId, command.userId(), command.amount(), now);
 
         // Phase 2: write event + PENDING order, then commit — DB connection released
         transactionTemplate.executeWithoutResult(tx -> {
-            appendEvent(orderId, "OrderCreated",
-                    new OrderCreatedEvent(orderId, command.userId(), command.amount(), now));
+            appendEvent(orderId, "OrderCreated", createdEvent);
             Order order = new Order();
             order.setId(orderId);
             order.setUserId(command.userId());
@@ -55,6 +57,11 @@ public class OrderCommandHandler {
             order.setCreatedAt(now);
             orderRepository.save(order);
         });
+
+        // SAGA start signal for KEDA — publish AFTER commit so a rolled-back
+        // tx never emits a phantom event. Fire-and-forget; SQS failures are
+        // logged, not surfaced to the caller.
+        orderEventPublisher.publishOrderCreated(createdEvent);
 
         // Phase 3: call payment — no DB connection held
         try {

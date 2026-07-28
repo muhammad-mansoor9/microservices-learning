@@ -34,6 +34,11 @@ output "aws_load_balancer_controller_role_arn" {
   value       = module.aws_lb_controller_irsa.iam_role_arn
 }
 
+output "ebs_csi_driver_role_arn" {
+  description = "IRSA role ARN attached to the aws-ebs-csi-driver addon"
+  value       = module.ebs_csi_irsa.iam_role_arn
+}
+
 output "order_service_role_arn" {
   description = "IRSA role ARN for default/order-service"
   value       = module.order_service_irsa.iam_role_arn

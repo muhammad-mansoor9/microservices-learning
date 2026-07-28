@@ -1,4 +1,25 @@
 # -----------------------------------------------------------------------------
+# EBS CSI driver — IRSA for kube-system/ebs-csi-controller-sa.
+# The aws-ebs-csi-driver addon cannot reach ACTIVE state without a role that
+# lets the controller call the EC2 API (CreateVolume, AttachVolume, ...).
+# -----------------------------------------------------------------------------
+module "ebs_csi_irsa" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.44"
+
+  role_name = "${var.cluster_name}-ebs-csi-driver"
+
+  attach_ebs_csi_policy = true
+
+  oidc_providers = {
+    main = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["kube-system:ebs-csi-controller-sa"]
+    }
+  }
+}
+
+# -----------------------------------------------------------------------------
 # AWS Load Balancer Controller — IRSA for kube-system/aws-load-balancer-controller
 # Uses the sub-module's built-in policy (rendered from the official upstream JSON).
 # -----------------------------------------------------------------------------

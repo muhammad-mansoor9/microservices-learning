@@ -1,0 +1,135 @@
+name: EKS deploy
+
+on:
+  push:
+    branches:
+      - scenario-3-eks
+
+concurrency:
+  group: eks-deploy
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPO_NAMESPACE: ms-learning
+
+jobs:
+  build-and-push:
+    name: Build and push images
+    runs-on: ubuntu-latest
+    outputs:
+      short_sha: ${{ steps.sha.outputs.short_sha }}
+      ecr_registry: ${{ steps.ecr-login.outputs.registry }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Compute short SHA
+        id: sha
+        run: echo "short_sha=$(echo ${GITHUB_SHA} | cut -c1-8)" >> "$GITHUB_OUTPUT"
+
+      - name: Build order-service
+        run: mvn -B --no-transfer-progress -pl order-service -am -DskipTests clean package
+
+      - name: Docker build and push order-service
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG_FULL: ${{ github.sha }}
+          IMAGE_TAG_SHORT: ${{ steps.sha.outputs.short_sha }}
+        run: |
+          IMAGE="${ECR_REGISTRY}/${ECR_REPO_NAMESPACE}/order-service"
+          docker build -f order-service/Dockerfile \
+            -t "${IMAGE}:${IMAGE_TAG_FULL}" \
+            -t "${IMAGE}:${IMAGE_TAG_SHORT}" \
+            .
+          docker push "${IMAGE}:${IMAGE_TAG_FULL}"
+          docker push "${IMAGE}:${IMAGE_TAG_SHORT}"
+
+      - name: Build payment-service
+        run: mvn -B --no-transfer-progress -pl payment-service -am -DskipTests package
+
+      - name: Docker build and push payment-service
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG_FULL: ${{ github.sha }}
+          IMAGE_TAG_SHORT: ${{ steps.sha.outputs.short_sha }}
+        run: |
+          IMAGE="${ECR_REGISTRY}/${ECR_REPO_NAMESPACE}/payment-service"
+          docker build -f payment-service/Dockerfile \
+            -t "${IMAGE}:${IMAGE_TAG_FULL}" \
+            -t "${IMAGE}:${IMAGE_TAG_SHORT}" \
+            .
+          docker push "${IMAGE}:${IMAGE_TAG_FULL}"
+          docker push "${IMAGE}:${IMAGE_TAG_SHORT}"
+
+      - name: Build user-service
+        run: mvn -B --no-transfer-progress -pl user-service -am -DskipTests package
+
+      - name: Docker build and push user-service
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG_FULL: ${{ github.sha }}
+          IMAGE_TAG_SHORT: ${{ steps.sha.outputs.short_sha }}
+        run: |
+          IMAGE="${ECR_REGISTRY}/${ECR_REPO_NAMESPACE}/user-service"
+          docker build -f user-service/Dockerfile \
+            -t "${IMAGE}:${IMAGE_TAG_FULL}" \
+            -t "${IMAGE}:${IMAGE_TAG_SHORT}" \
+            .
+          docker push "${IMAGE}:${IMAGE_TAG_FULL}"
+          docker push "${IMAGE}:${IMAGE_TAG_SHORT}"
+
+  update-helm-values:
+    name: Update Helm values with new image tag
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Install yq
+        uses: mikefarah/yq@master
+
+      - name: Update image.tag in helm/values-prod.yaml
+        env:
+          SHORT_SHA: ${{ needs.build-and-push.outputs.short_sha }}
+        run: |
+          yq -i ".image.tag = strenv(SHORT_SHA)" helm/values-prod.yaml
+
+      - name: Commit and push
+        env:
+          SHORT_SHA: ${{ needs.build-and-push.outputs.short_sha }}
+        run: |
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name  "github-actions[bot]"
+          git add helm/values-prod.yaml
+          if git diff --cached --quiet; then
+            echo "no image-tag change to commit"
+            exit 0
+          fi
+          git commit -m "chore: update image tags to ${SHORT_SHA} [skip ci]"
+          git push origin HEAD:${GITHUB_REF_NAME}

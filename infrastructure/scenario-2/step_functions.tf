@@ -77,236 +77,13 @@ resource "aws_security_group" "saga_lambdas" {
 # resource would be stripped on every apply because inline ingress is
 # authoritative.
 
-# ── Lambda Source Archives ────────────────────────────────────────────────────
+# ── Lambda Source Artifact ────────────────────────────────────────────────────
+# Shaded jar produced by `mvn -pl saga-lambdas package` at the repo root.
+# All five Lambdas share this single jar; each aws_lambda_function selects a
+# different handler class.
 
-data "archive_file" "validate_user" {
-  type        = "zip"
-  output_path = "${path.module}/sfn_validate_user.zip"
-  source {
-    filename = "lambda_function.py"
-    content  = <<-PYTHON
-      import os, json, random, boto3, urllib.request, urllib.error
-
-      NAMESPACE = os.environ['SERVICE_NAMESPACE']
-      _sd = None
-
-      def sd():
-          global _sd
-          if _sd is None:
-              _sd = boto3.client('servicediscovery')
-          return _sd
-
-      def discover_ip(svc):
-          r = sd().discover_instances(
-              NamespaceName=NAMESPACE, ServiceName=svc,
-              MaxResults=10, HealthStatus='HEALTHY')
-          instances = r.get('Instances', [])
-          if not instances:
-              raise Exception(f'No healthy instances for {svc}')
-          return random.choice(instances)['Attributes']['AWS_INSTANCE_IPV4']
-
-      def handler(event, context):
-          user_id = event['userId']
-          ip  = discover_ip('user-service')
-          url = f'http://{ip}:8080/api/users/{user_id}'
-          try:
-              with urllib.request.urlopen(url, timeout=10) as r:
-                  return json.loads(r.read())
-          except urllib.error.HTTPError as e:
-              if e.code == 404:
-                  raise Exception('UserNotFoundException')
-              raise
-    PYTHON
-  }
-}
-
-data "archive_file" "process_payment" {
-  type        = "zip"
-  output_path = "${path.module}/sfn_process_payment.zip"
-  source {
-    filename = "lambda_function.py"
-    content  = <<-PYTHON
-      import os, json, random, boto3, urllib.request
-
-      NAMESPACE = os.environ['SERVICE_NAMESPACE']
-      _sd = None
-
-      def sd():
-          global _sd
-          if _sd is None:
-              _sd = boto3.client('servicediscovery')
-          return _sd
-
-      def discover_ip(svc):
-          r = sd().discover_instances(
-              NamespaceName=NAMESPACE, ServiceName=svc,
-              MaxResults=10, HealthStatus='HEALTHY')
-          instances = r.get('Instances', [])
-          if not instances:
-              raise Exception(f'No healthy instances for {svc}')
-          return random.choice(instances)['Attributes']['AWS_INSTANCE_IPV4']
-
-      def handler(event, context):
-          ip      = discover_ip('payment-service')
-          payload = json.dumps({
-              'orderId': event['orderId'],
-              'userId':  event['userId'],
-              'amount':  event['amount'],
-          }).encode()
-          req = urllib.request.Request(
-              f'http://{ip}:8080/api/payments',
-              data=payload,
-              headers={'Content-Type': 'application/json'},
-              method='POST',
-          )
-          with urllib.request.urlopen(req, timeout=15) as r:
-              return json.loads(r.read())
-    PYTHON
-  }
-}
-
-data "archive_file" "confirm_order" {
-  type        = "zip"
-  output_path = "${path.module}/sfn_confirm_order.zip"
-  source {
-    filename = "lambda_function.py"
-    content  = <<-PYTHON
-      import os, json, random, boto3, urllib.request
-
-      NAMESPACE     = os.environ['SERVICE_NAMESPACE']
-      KEY_PARAM     = os.environ['INTERNAL_API_KEY_PARAM']
-      _sd = _ssm = _key = None
-
-      def sd():
-          global _sd
-          if _sd is None:
-              _sd = boto3.client('servicediscovery')
-          return _sd
-
-      def api_key():
-          global _ssm, _key
-          if _key is None:
-              if _ssm is None:
-                  _ssm = boto3.client('ssm')
-              _key = _ssm.get_parameter(Name=KEY_PARAM, WithDecryption=True)['Parameter']['Value']
-          return _key
-
-      def discover_ip(svc):
-          r = sd().discover_instances(
-              NamespaceName=NAMESPACE, ServiceName=svc,
-              MaxResults=10, HealthStatus='HEALTHY')
-          instances = r.get('Instances', [])
-          if not instances:
-              raise Exception(f'No healthy instances for {svc}')
-          return random.choice(instances)['Attributes']['AWS_INSTANCE_IPV4']
-
-      def handler(event, context):
-          order_id = event['orderId']
-          ip  = discover_ip('order-service')
-          req = urllib.request.Request(
-              f'http://{ip}:8080/api/orders/{order_id}/confirm',
-              data=b'{}',
-              headers={'Content-Type': 'application/json', 'X-Internal-Api-Key': api_key()},
-              method='POST',
-          )
-          with urllib.request.urlopen(req, timeout=15) as r:
-              return {'status': 'confirmed', 'orderId': order_id}
-    PYTHON
-  }
-}
-
-data "archive_file" "refund_payment" {
-  type        = "zip"
-  output_path = "${path.module}/sfn_refund_payment.zip"
-  source {
-    filename = "lambda_function.py"
-    content  = <<-PYTHON
-      import os, json, random, boto3, urllib.request
-
-      NAMESPACE = os.environ['SERVICE_NAMESPACE']
-      _sd = None
-
-      def sd():
-          global _sd
-          if _sd is None:
-              _sd = boto3.client('servicediscovery')
-          return _sd
-
-      def discover_ip(svc):
-          r = sd().discover_instances(
-              NamespaceName=NAMESPACE, ServiceName=svc,
-              MaxResults=10, HealthStatus='HEALTHY')
-          instances = r.get('Instances', [])
-          if not instances:
-              raise Exception(f'No healthy instances for {svc}')
-          return random.choice(instances)['Attributes']['AWS_INSTANCE_IPV4']
-
-      def handler(event, context):
-          payment    = event.get('payment') or {}
-          payment_id = payment.get('paymentId')
-          if not payment_id:
-              return {'status': 'no_payment_to_refund'}
-          ip  = discover_ip('payment-service')
-          req = urllib.request.Request(
-              f'http://{ip}:8080/api/payments/{payment_id}/refund',
-              data=b'{}',
-              headers={'Content-Type': 'application/json'},
-              method='POST',
-          )
-          with urllib.request.urlopen(req, timeout=15) as r:
-              return json.loads(r.read())
-    PYTHON
-  }
-}
-
-data "archive_file" "cancel_order" {
-  type        = "zip"
-  output_path = "${path.module}/sfn_cancel_order.zip"
-  source {
-    filename = "lambda_function.py"
-    content  = <<-PYTHON
-      import os, json, random, boto3, urllib.request
-
-      NAMESPACE = os.environ['SERVICE_NAMESPACE']
-      KEY_PARAM = os.environ['INTERNAL_API_KEY_PARAM']
-      _sd = _ssm = _key = None
-
-      def sd():
-          global _sd
-          if _sd is None:
-              _sd = boto3.client('servicediscovery')
-          return _sd
-
-      def api_key():
-          global _ssm, _key
-          if _key is None:
-              if _ssm is None:
-                  _ssm = boto3.client('ssm')
-              _key = _ssm.get_parameter(Name=KEY_PARAM, WithDecryption=True)['Parameter']['Value']
-          return _key
-
-      def discover_ip(svc):
-          r = sd().discover_instances(
-              NamespaceName=NAMESPACE, ServiceName=svc,
-              MaxResults=10, HealthStatus='HEALTHY')
-          instances = r.get('Instances', [])
-          if not instances:
-              raise Exception(f'No healthy instances for {svc}')
-          return random.choice(instances)['Attributes']['AWS_INSTANCE_IPV4']
-
-      def handler(event, context):
-          order_id = event['orderId']
-          ip  = discover_ip('order-service')
-          req = urllib.request.Request(
-              f'http://{ip}:8080/api/orders/{order_id}/cancel',
-              data=b'{}',
-              headers={'Content-Type': 'application/json', 'X-Internal-Api-Key': api_key()},
-              method='POST',
-          )
-          with urllib.request.urlopen(req, timeout=15) as r:
-              return {'status': 'cancelled', 'orderId': order_id}
-    PYTHON
-  }
+locals {
+  saga_lambda_jar = "${path.module}/../../saga-lambdas/target/saga-lambdas.jar"
 }
 
 # ── Lambda Functions ──────────────────────────────────────────────────────────
@@ -325,12 +102,19 @@ locals {
 resource "aws_lambda_function" "validate_user" {
   function_name    = "${local.name_prefix}-saga-validate-user"
   role             = aws_iam_role.saga_lambda.arn
-  filename         = data.archive_file.validate_user.output_path
-  source_code_hash = data.archive_file.validate_user.output_base64sha256
-  handler          = "lambda_function.handler"
-  runtime          = "python3.12"
-  timeout          = 30
-  memory_size      = 256
+  filename         = local.saga_lambda_jar
+  source_code_hash = filebase64sha256(local.saga_lambda_jar)
+  handler          = "com.example.saga.ValidateUserHandler::handleRequest"
+  runtime          = "java21"
+  timeout          = 60
+  memory_size      = 512
+
+  # SnapStart: publish an immutable version on each deploy, snapshot the
+  # initialized JVM, and restore from that snapshot on cold starts.
+  publish = true
+  snap_start {
+    apply_on = "PublishedVersions"
+  }
 
   vpc_config {
     subnet_ids         = local.lambda_vpc_config.subnet_ids
@@ -347,12 +131,19 @@ resource "aws_lambda_function" "validate_user" {
 resource "aws_lambda_function" "process_payment" {
   function_name    = "${local.name_prefix}-saga-process-payment"
   role             = aws_iam_role.saga_lambda.arn
-  filename         = data.archive_file.process_payment.output_path
-  source_code_hash = data.archive_file.process_payment.output_base64sha256
-  handler          = "lambda_function.handler"
-  runtime          = "python3.12"
-  timeout          = 30
-  memory_size      = 256
+  filename         = local.saga_lambda_jar
+  source_code_hash = filebase64sha256(local.saga_lambda_jar)
+  handler          = "com.example.saga.ProcessPaymentHandler::handleRequest"
+  runtime          = "java21"
+  timeout          = 60
+  memory_size      = 512
+
+  # SnapStart: publish an immutable version on each deploy, snapshot the
+  # initialized JVM, and restore from that snapshot on cold starts.
+  publish = true
+  snap_start {
+    apply_on = "PublishedVersions"
+  }
 
   vpc_config {
     subnet_ids         = local.lambda_vpc_config.subnet_ids
@@ -369,12 +160,19 @@ resource "aws_lambda_function" "process_payment" {
 resource "aws_lambda_function" "confirm_order" {
   function_name    = "${local.name_prefix}-saga-confirm-order"
   role             = aws_iam_role.saga_lambda.arn
-  filename         = data.archive_file.confirm_order.output_path
-  source_code_hash = data.archive_file.confirm_order.output_base64sha256
-  handler          = "lambda_function.handler"
-  runtime          = "python3.12"
-  timeout          = 30
-  memory_size      = 256
+  filename         = local.saga_lambda_jar
+  source_code_hash = filebase64sha256(local.saga_lambda_jar)
+  handler          = "com.example.saga.ConfirmOrderHandler::handleRequest"
+  runtime          = "java21"
+  timeout          = 60
+  memory_size      = 512
+
+  # SnapStart: publish an immutable version on each deploy, snapshot the
+  # initialized JVM, and restore from that snapshot on cold starts.
+  publish = true
+  snap_start {
+    apply_on = "PublishedVersions"
+  }
 
   vpc_config {
     subnet_ids         = local.lambda_vpc_config.subnet_ids
@@ -393,12 +191,19 @@ resource "aws_lambda_function" "confirm_order" {
 resource "aws_lambda_function" "refund_payment" {
   function_name    = "${local.name_prefix}-saga-refund-payment"
   role             = aws_iam_role.saga_lambda.arn
-  filename         = data.archive_file.refund_payment.output_path
-  source_code_hash = data.archive_file.refund_payment.output_base64sha256
-  handler          = "lambda_function.handler"
-  runtime          = "python3.12"
-  timeout          = 30
-  memory_size      = 256
+  filename         = local.saga_lambda_jar
+  source_code_hash = filebase64sha256(local.saga_lambda_jar)
+  handler          = "com.example.saga.RefundPaymentHandler::handleRequest"
+  runtime          = "java21"
+  timeout          = 60
+  memory_size      = 512
+
+  # SnapStart: publish an immutable version on each deploy, snapshot the
+  # initialized JVM, and restore from that snapshot on cold starts.
+  publish = true
+  snap_start {
+    apply_on = "PublishedVersions"
+  }
 
   vpc_config {
     subnet_ids         = local.lambda_vpc_config.subnet_ids
@@ -415,12 +220,19 @@ resource "aws_lambda_function" "refund_payment" {
 resource "aws_lambda_function" "cancel_order" {
   function_name    = "${local.name_prefix}-saga-cancel-order"
   role             = aws_iam_role.saga_lambda.arn
-  filename         = data.archive_file.cancel_order.output_path
-  source_code_hash = data.archive_file.cancel_order.output_base64sha256
-  handler          = "lambda_function.handler"
-  runtime          = "python3.12"
-  timeout          = 30
-  memory_size      = 256
+  filename         = local.saga_lambda_jar
+  source_code_hash = filebase64sha256(local.saga_lambda_jar)
+  handler          = "com.example.saga.CancelOrderHandler::handleRequest"
+  runtime          = "java21"
+  timeout          = 60
+  memory_size      = 512
+
+  # SnapStart: publish an immutable version on each deploy, snapshot the
+  # initialized JVM, and restore from that snapshot on cold starts.
+  publish = true
+  snap_start {
+    apply_on = "PublishedVersions"
+  }
 
   vpc_config {
     subnet_ids         = local.lambda_vpc_config.subnet_ids
@@ -460,11 +272,18 @@ data "aws_iam_policy_document" "order_saga_sfn" {
     effect  = "Allow"
     actions = ["lambda:InvokeFunction"]
     resources = [
+      # Unqualified allows invoking $LATEST; the ":*" wildcard covers every
+      # published version (SnapStart requires invoking a versioned qualifier).
       aws_lambda_function.validate_user.arn,
+      "${aws_lambda_function.validate_user.arn}:*",
       aws_lambda_function.process_payment.arn,
+      "${aws_lambda_function.process_payment.arn}:*",
       aws_lambda_function.confirm_order.arn,
+      "${aws_lambda_function.confirm_order.arn}:*",
       aws_lambda_function.refund_payment.arn,
+      "${aws_lambda_function.refund_payment.arn}:*",
       aws_lambda_function.cancel_order.arn,
+      "${aws_lambda_function.cancel_order.arn}:*",
     ]
   }
 
@@ -506,12 +325,14 @@ resource "aws_sfn_state_machine" "order_saga" {
   name     = "${local.name_prefix}-order-saga"
   role_arn = aws_iam_role.order_saga_sfn.arn
 
+  # qualified_arn includes the published version (e.g. …:validate_user:3), so
+  # Step Functions invokes the SnapStart-restored version, not $LATEST.
   definition = templatefile("${path.module}/step_functions/order_saga.json", {
-    validate_user_lambda_arn   = aws_lambda_function.validate_user.arn
-    process_payment_lambda_arn = aws_lambda_function.process_payment.arn
-    confirm_order_lambda_arn   = aws_lambda_function.confirm_order.arn
-    refund_payment_lambda_arn  = aws_lambda_function.refund_payment.arn
-    cancel_order_lambda_arn    = aws_lambda_function.cancel_order.arn
+    validate_user_lambda_arn   = aws_lambda_function.validate_user.qualified_arn
+    process_payment_lambda_arn = aws_lambda_function.process_payment.qualified_arn
+    confirm_order_lambda_arn   = aws_lambda_function.confirm_order.qualified_arn
+    refund_payment_lambda_arn  = aws_lambda_function.refund_payment.qualified_arn
+    cancel_order_lambda_arn    = aws_lambda_function.cancel_order.qualified_arn
   })
 
   logging_configuration {
